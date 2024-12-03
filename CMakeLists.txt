@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.20.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
-project(dtls_project)
+project(DTLS_COAP_PROJECT)
 
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/certs/rootCAs/certs)
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/certs/clientCert/key)
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/certs/clientCert/cert)
 target_sources(app PRIVATE src/main.c)
