@@ -41,9 +41,9 @@ extern "C"
 #undef NO_ASN_TIME
 
 /*Optional Hardening Options against Blinding and Side-Channel attacks - slows down DTLS handshake)*/
-// #define TFM_TIMING_RESISTANT
-// #define ECC_TIMING_RESISTANT
-// #define WC_RSA_BLINDING
+//#define TFM_TIMING_RESISTANT
+//#define ECC_TIMING_RESISTANT
+//#define WC_RSA_BLINDING
 
 #ifdef __cplusplus
 }
