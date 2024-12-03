@@ -42,7 +42,7 @@
 #define PSK_KEY "ddbbba39dace95ed"
 #define PSK_IDENTITY "Client_identity"
 
-#define SERVER_IP "77.23.124.146"
+#define SERVER_IP "your server IP"
 #define SERVER_PORT 2444
 
 /*Choose the Zephyr log level
