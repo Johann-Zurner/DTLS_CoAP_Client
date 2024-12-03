@@ -23,17 +23,17 @@
 #include "client-cert2-der.h" //RSA key
 #include "client-key2-der.h"  //RSA key
 
-#define USE_ECDSA    // Comment out if to use Root and Server certs with RSA keys (2048 bits) rather than ECDSA (ECDSA is faster, has 256 bits)
-#define USE_CID      // Comment out to not use Connection ID
-#define CERTS        // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-#define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
-#define SHOW_WOLFSSL_DEBUG // Comment out if you don't want to see WolfSSL Debug logs with timestamps
-#define COAP_INTERVAL 5 // Set the time interval between CoAP PUT messages
-#define COAP_MAX 50     // Set the maximum number of CoAP messages before DTLS session shuts down
+#define USE_ECDSA          // Comment out to use Root and Server certs with RSA keys (2048 bits) instead of ECDSA (ECDSA is faster, has 256 bits)
+#define USE_CID            // Comment out to NOT use Connection ID
+#define CERTS              // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
+#define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
+#define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
+#define COAP_INTERVAL 5    // Set the time interval between CoAP PUT messages
+#define COAP_MAX 50        // Set the maximum number of CoAP messages before DTLS session shuts down
 
 #define LED0_NODE DT_ALIAS(led0) // LED0_NODE = led0 defined in the .dts file; Lights up when DTLS Handshake is successfull
 
-/*These lines are for adding colors to debug output*/
+/* These lines are for adding colors to debug output */
 #define GREEN "\033[32m"
 #define RED "\033[31m"
 #define RESET "\033[0m"
@@ -45,8 +45,8 @@
 #define SERVER_IP "your server IP"
 #define SERVER_PORT 2444
 
-/*Choose the Zephyr log level
-e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.)*/
+/* Choose the Zephyr log level
+e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
 LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
 
 // Used for WolfSSL custom logging to add timestamps to each log output
@@ -75,7 +75,6 @@ int main(void)
         int cid = -1;
         uint8_t send_buffer[1152];
         uint8_t receive_buffer[COAP_MAX_PDU_SIZE];
-        uint16_t message_id;
         struct coap_packet coap_message;
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
@@ -97,7 +96,7 @@ int main(void)
         wolfSSL_Init();
 
 #ifdef SHOW_WOLFSSL_DEBUG
-        wolfSSL_SetLoggingCb(CustomLoggingCallback); //Comment out to get debug without timestamps
+        wolfSSL_SetLoggingCb(CustomLoggingCallback); // Comment out to get debug without timestamps
         wolfSSL_Debugging_ON();
 #endif
 
@@ -147,7 +146,6 @@ int main(void)
 
         int k = 0;
         n = COAP_MAX;
-        message_id = 12934;
         while (true)
         {
                 int temperature = 1 + (k++);
