@@ -28,9 +28,23 @@ This project implements a CoAP client that communicates securely using DTLS. The
 ## Setup Instructions (nRF Connect for VS Code)
 1. Open nRF Connect for Desktop and open Toolmanager
 ![image](https://github.com/user-attachments/assets/667f3e1f-1209-48f3-abf0-a473978082f7)
-2. Install the latest nrf Connect SDK (at time of creation of this read.me it was v2.8.0) and click Open VS Code
+2. If not yet installed, install the latest nrf Connect SDK (at time of creation of this read.me it was v2.8.0)
+3. Download and install WolfSSL crypto library.
+   - Look for the west.yml file. It's usually in root directory of the NCS installation (On Windows it's in C:\ncs\v2.8.0\nrf\west.yml)and open it with a text editor.
+   - Add this unter *remotes:*:
+    \# WolfSSL Repo
+    \- name: wolfssl
+      url-base: https://github.com/wolfssl
+   \- and this under *projects:*:
+    \# WolfSSL master branch
+    \- name: wolfssl
+      path: modules/crypto/wolfssl
+      revision: master
+    - Now in the Toolchain manager click update SDK and it will downlod wolfssl. Alternatively run west update from a nRF Connect terminal
+      ![image](https://github.com/user-attachments/assets/0da0ce55-8733-4ffa-9537-78676742c32e)
+4. Now from toolchain manager open visual studio code 
 ![image](https://github.com/user-attachments/assets/6d8ce488-6fc5-4820-a893-cd56e80477cd)
-3. 
+5. 
 
 
 ### 1. Clone the Project
