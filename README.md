@@ -17,7 +17,7 @@ This project implements a CoAP client that communicates securely using DTLS. The
 ## Requirements
 
 ### Hardware
-- **Tested Boards**: Nordic Semiconductor nRF9160 (compatibility with other boards is not guaranteed).
+- **Tested Boards**: Nordic Semiconductor nRF9160DK (compatibility with other boards is not guaranteed).
 
 ### Software
 - **nRF Connect for Visual Studio Code**: Set up your environment using the [nRF Connect Getting Started Guide](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-VS-Code/Tutorials#infotabs).
@@ -26,14 +26,19 @@ This project implements a CoAP client that communicates securely using DTLS. The
 ---
 
 ## Setup Instructions (nRF Connect for VS Code)
-1. Open nRF Connect for Desktop and open Toolmanager
+1. Open nRF Connect for Desktop and open Toolchain Manager
    
-![image](https://github.com/user-attachments/assets/667f3e1f-1209-48f3-abf0-a473978082f7)
+   ![image](https://github.com/user-attachments/assets/667f3e1f-1209-48f3-abf0-a473978082f7)
 
-3. If not yet installed, install the latest nrf Connect SDK (at time of creation of this read.me it was v2.8.0)
+3. If not yet installed, install the latest nrf Connect SDK (at time of creation of this read.me it was v2.8.0), install the nRF Connect VS extension and click "Open VS Code".
+   
+   ![image](https://github.com/user-attachments/assets/289bad61-42c5-4ee3-a051-3782cb0150b9)
+
 4. Download and install WolfSSL crypto library.
-   Look for the `west.yml` file. It's usually in the root directory of the NCS installation.  
-   **On Windows:** It's located at `C:\ncs\v2.8.0\nrf\west.yml`. Open it with a text editor.
+   In the VS Explorer look for the `west.yml` file. It's usually in the root directory of the NCS installation (there are several west.yml files).  
+   On Windows it's located at `C:\ncs\v2.8.0\nrf\west.yml`.
+   
+   ![image](https://github.com/user-attachments/assets/bfae4688-ca07-4e21-b2e5-9366b2c5cb70)
 
    Add this under *remotes:*:
    ```yaml
@@ -47,15 +52,16 @@ This project implements a CoAP client that communicates securely using DTLS. The
    - name: wolfssl
      path: modules/crypto/wolfssl
      revision: master
+     remote: wolfssl
     ```
-5. Now in the Toolchain manager click update SDK and it will download wolfssl. Alternatively run west update from a nRF Connect terminal
+5. Now save the west.yml file and in the Toolchain manager click update SDK and it will download wolfssl. Alternatively, run `west update` from a nRF Connect terminal window
    
       ![image](https://github.com/user-attachments/assets/0da0ce55-8733-4ffa-9537-78676742c32e)
-7. Now from toolchain manager open visual studio code
-   
-![image](https://github.com/user-attachments/assets/6d8ce488-6fc5-4820-a893-cd56e80477cd)
-9. 
 
+6. You may now choose to add this repo to Visual Studio Code or just download to your chosen location and import the project.
+   If you have downloaded this project click the nRF connect extension in VS code and under WELCOME select `+ Open an existing application`
+   
+   ![image](https://github.com/user-attachments/assets/33b43322-ada2-4f3f-8a24-2c600bb65936)
 
 ### 1. Clone the Project
 1. Open **Visual Studio Code** with the **nRF Connect extension** installed.
