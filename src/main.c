@@ -25,8 +25,8 @@
 
 #define USE_ECDSA // Comment out to use Root and Client certs with RSA keys (2048 bits) instead of ECDSA (ECDSA is faster, has 256 bits)
 #define USE_CID   // Comment out to NOT use Connection ID
-// #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-#define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
+#define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
+// #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
 #define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
 #define COAP_INTERVAL 5    // Set the time interval between CoAP PUT messages
 #define COAP_MAX 50        // Set the maximum number of CoAP messages before DTLS session shuts down
@@ -69,6 +69,7 @@ static void lte_handler(const struct lte_lc_evt *const evt);
 static int modem_configure(void);
 
 void setup_cert(WOLFSSL_CTX *ctx);
+void show_supported_ciphers();
 
 int main(void)
 {
@@ -102,8 +103,9 @@ int main(void)
         wolfSSL_Init();
 
 #ifdef SHOW_WOLFSSL_DEBUG
-        wolfSSL_SetLoggingCb(CustomLoggingCallback); // Comment out to get debug without timestamps
+        wolfSSL_SetLoggingCb(CustomLoggingCallback); // Comment out to get debug without timestamps (makes it a bit faster)
         wolfSSL_Debugging_ON();
+        show_supported_ciphers(); // Comment out to NOT see the list of supported ciphes for your build
 #endif
 
         ctx = wolfSSL_CTX_new(method);
@@ -113,16 +115,6 @@ int main(void)
 #else
         wolfSSL_CTX_use_psk_identity_hint(ctx, PSK_IDENTITY);
         wolfSSL_CTX_set_psk_client_callback(ctx, my_psk_client_callback);
-        uint8_t cipher_buffer[2048];
-        wolfSSL_get_ciphers(cipher_buffer, BUFFER_SIZE);
-        for (char *p = (char *)cipher_buffer; *p; p++)
-        {
-                if (*p == ':')
-                {
-                        *p = '\n';
-                }
-        }
-        printf("Enabled Ciphers:\n%s\n", cipher_buffer); //comment out if you dont want to see supported ciphers
 #endif
 
         ssl = wolfSSL_new(ctx);
@@ -422,4 +414,18 @@ void setup_cert(WOLFSSL_CTX *ctx)
 void CustomLoggingCallback(const int logLevel, const char *const logMessage)
 {
         LOG_INF("WolfSSL: %s", logMessage);
+}
+
+void show_supported_ciphers()
+{
+        uint8_t cipher_buffer[2048];
+        wolfSSL_get_ciphers(cipher_buffer, BUFFER_SIZE);
+        for (char *p = (char *)cipher_buffer; *p; p++) //bring ":" separated list into readable format"
+        {
+                if (*p == ':')
+                {
+                        *p = '\n';
+                }
+        }
+        printf("Enabled Ciphers:\n%s\n", cipher_buffer);
 }
