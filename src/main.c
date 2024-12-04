@@ -44,7 +44,7 @@
 #define PSK_KEY "\xdd\xbb\xba\x39\xda\xce\x95\xed\x12\x34\x56\x78\x90\xab\xcd\xef"
 #define PSK_KEY_LEN 16
 
-#define SERVER_IP "77.23.124.146"
+#define SERVER_IP "your server IP"
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
 
