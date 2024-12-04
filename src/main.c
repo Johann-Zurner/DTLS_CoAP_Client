@@ -23,9 +23,9 @@
 #include "client-cert2-der.h" //RSA key
 #include "client-key2-der.h"  //RSA key
 
-#define USE_ECDSA          // Comment out to use Root and Server certs with RSA keys (2048 bits) instead of ECDSA (ECDSA is faster, has 256 bits)
-#define USE_CID            // Comment out to NOT use Connection ID
-#define CERTS              // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
+#define USE_ECDSA // Comment out to use Root and Client certs with RSA keys (2048 bits) instead of ECDSA (ECDSA is faster, has 256 bits)
+#define USE_CID   // Comment out to NOT use Connection ID
+// #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
 #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
 #define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
 #define COAP_INTERVAL 5    // Set the time interval between CoAP PUT messages
@@ -38,12 +38,15 @@
 #define RED "\033[31m"
 #define RESET "\033[0m"
 
-#define COAP_MAX_PDU_SIZE 1152
-#define PSK_KEY "ddbbba39dace95ed"
+#define COAP_MAX_PDU_SIZE 128
+// #define PSK_KEY "ddbbba39dace95ed"
 #define PSK_IDENTITY "Client_identity"
+#define PSK_KEY "\xdd\xbb\xba\x39\xda\xce\x95\xed\x12\x34\x56\x78\x90\xab\xcd\xef"
+#define PSK_KEY_LEN 16
 
-#define SERVER_IP "your server IP"
+#define SERVER_IP "77.23.124.146"
 #define SERVER_PORT 2444
+#define BUFFER_SIZE 1024
 
 /* Choose the Zephyr log level
 e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
@@ -73,13 +76,16 @@ int main(void)
         static struct sockaddr_in serverAddr;
         int ret, err, n;
         int cid = -1;
-        uint8_t send_buffer[1152];
-        uint8_t receive_buffer[COAP_MAX_PDU_SIZE];
+        uint8_t send_buffer[BUFFER_SIZE];
+        uint8_t receive_buffer[BUFFER_SIZE];
         struct coap_packet coap_message;
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
+#ifdef USE_DTLS_1_3
+        WOLFSSL_METHOD *method = wolfDTLSv1_3_client_method();
+#else
         WOLFSSL_METHOD *method = wolfDTLSv1_2_client_method();
-
+#endif
         ret = modem_configure();
         if (ret)
         {
@@ -102,11 +108,21 @@ int main(void)
 
         ctx = wolfSSL_CTX_new(method);
 
-#ifdef CERTS
+#ifdef USE_CERTS
         setup_cert(ctx);
 #else
         wolfSSL_CTX_use_psk_identity_hint(ctx, PSK_IDENTITY);
         wolfSSL_CTX_set_psk_client_callback(ctx, my_psk_client_callback);
+        uint8_t cipher_buffer[2048];
+        wolfSSL_get_ciphers(cipher_buffer, BUFFER_SIZE);
+        for (char *p = (char *)cipher_buffer; *p; p++)
+        {
+                if (*p == ':')
+                {
+                        *p = '\n';
+                }
+        }
+        printf("Enabled Ciphers:\n%s\n", cipher_buffer); //comment out if you dont want to see supported ciphers
 #endif
 
         ssl = wolfSSL_new(ctx);
@@ -141,7 +157,7 @@ int main(void)
         else
         {
                 err = wolfSSL_get_error(ssl, 0);
-                LOG_INF(GREEN "CID not enabled %d, %s" RESET, err, wolfSSL_ERR_reason_error_string(err));
+                LOG_INF(GREEN "CID not enabled" RESET);
         }
 
         int k = 0;
@@ -285,6 +301,7 @@ void verify_coap_message(uint8_t *receive_buffer, int ret)
         // Get the message ID
         uint16_t message_id = coap_header_get_id(&response);
         LOG_INF(GREEN "Received Message ID in Ack: %d" RESET, message_id);
+        return;
 }
 
 unsigned int my_psk_client_callback(WOLFSSL *ssl, const char *hint,
@@ -292,8 +309,8 @@ unsigned int my_psk_client_callback(WOLFSSL *ssl, const char *hint,
                                     unsigned char *key, unsigned int key_max_len)
 {
         strncpy(identity, PSK_IDENTITY, id_max_len);
-        memcpy(key, PSK_KEY, strlen(PSK_KEY));
-        return strlen(PSK_KEY);
+        memcpy(key, PSK_KEY, PSK_KEY_LEN);
+        return PSK_KEY_LEN;
 }
 
 static void lte_handler(const struct lte_lc_evt *const evt)
