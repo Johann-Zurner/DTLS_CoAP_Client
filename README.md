@@ -40,13 +40,13 @@ This project implements a CoAP client that communicates securely using DTLS. The
    
    ![image](https://github.com/user-attachments/assets/bfae4688-ca07-4e21-b2e5-9366b2c5cb70)
 
-   Add this under *remotes:*:
+   Add this under *remotes*:
    ```yaml
    # WolfSSL Repo
    - name: wolfssl
      url-base: https://github.com/wolfssl
    ```
-   and this under *projects:*:
+   and this under *projects*:
    ```yaml
    # WolfSSL master branch
    - name: wolfssl
