@@ -58,13 +58,9 @@ This project implements a CoAP client that communicates securely using DTLS. The
    
       ![image](https://github.com/user-attachments/assets/0da0ce55-8733-4ffa-9537-78676742c32e)
 
-6. You may now choose to add this repo to Visual Studio Code or just download to your chosen location and import the project.
-   If you have downloaded this project, click the nRF connect extension in VS code and under WELCOME select `+ Open an existing application`. Then browse to the dowloaded folder and import the project.
-   This will show you its folder structure in VS, then click the nRF Connect extension icon again
-   
-   ![image](https://github.com/user-attachments/assets/33b43322-ada2-4f3f-8a24-2c600bb65936)
+6. Clone this repository to your VS code environment
 
-7. Now click `Add build configuration` and select as board target `nrf9160dk/nrf9160/ns`
+7. Click `Add build configuration` and select as board target `nrf9160dk/nrf9160/ns`
    
    ![WhatsApp Bild 2024-12-05 um 01 02 48_49d84875](https://github.com/user-attachments/assets/0b5c3d51-0478-44a4-98ac-7df08fbffd5d)
 
