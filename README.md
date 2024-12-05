@@ -17,7 +17,7 @@ This project implements a CoAP client that communicates securely using DTLS. The
 ## Requirements
 
 ### Hardware
-- **Tested Boards**: Nordic Semiconductor nRF9160DK (compatibility with other boards is not guaranteed).
+- **Tested Boards**: Nordic Semiconductor nRF9160DK (compatibility with other boards unknown).
 
 ### Software
 - **nRF Connect for Visual Studio Code**: Set up your environment using the [nRF Connect Getting Started Guide](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-VS-Code/Tutorials#infotabs).
@@ -69,8 +69,14 @@ This project implements a CoAP client that communicates securely using DTLS. The
    ![WhatsApp Bild 2024-12-05 um 01 02 48_49d84875](https://github.com/user-attachments/assets/0b5c3d51-0478-44a4-98ac-7df08fbffd5d)
 
 8. Now scroll down and click the `Build Configuration` button. No you can browse `main()`, `prj.conf`, `/include/user_settings_custom.h` and other relevant files.
+   Make sure to set your server IP address in `main()`.
    Click `Flash` to flash the code onto the board.
 
-   ![image](https://github.com/user-attachments/assets/3222197e-750c-4976-9160-9cb315ce2750)
+   ![image](https://github.com/user-attachments/assets/89f4f63a-131c-4aa1-be03-2eed50bb60fb)
 
+10. The board will start executing code and will send a DTLS Client Hello to the server. You can open the nRF Connect Serial Terminal to see debug logs of the board.
+
+   ![image](https://github.com/user-attachments/assets/a071627b-ca02-4fb6-9074-c1ea7cff1c26)
+
+   ![image](https://github.com/user-attachments/assets/62ced6ae-8c4c-4f0e-90c3-d92835128914)
 
