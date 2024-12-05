@@ -50,7 +50,7 @@ extern "C"
 #define HAVE_ENCRYPT_THEN_MAC
 
 // #define WOLFSSL_NO_RSA
-/*#define HAVE_CHACHA
+/*
 #define HAVE_XCHACHA
 #define WOLFSSL_CUSTOM_CURVES
 #define WOLFSSL_RNG
@@ -60,8 +60,8 @@ extern "C"
 #define WOLFSSL_HAVE_PSA
 #define WC_PSA_CRYPTO
 */
-#define HAVE_CHACHA
-#define HAVE_POLY1305
+//#define HAVE_CHACHA
+//#define HAVE_POLY1305
 #ifdef __cplusplus
 }
 #endif

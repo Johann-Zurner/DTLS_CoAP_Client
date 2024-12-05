@@ -19,13 +19,9 @@
 #include "rootCA1-der.h"
 #include "client-cert-der.h"
 #include "client-key-der.h"
-#include "rootCA2-der.h"      //RSA key
-#include "client-cert2-der.h" //RSA key
-#include "client-key2-der.h"  //RSA key
 
-#define USE_ECDSA // Comment out to use Root and Client certs with RSA keys (2048 bits) instead of ECDSA (ECDSA is faster, has 256 bits)
 #define USE_CID   // Comment out to NOT use Connection ID
-#define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
+//#define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
 // #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
 #define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
 #define COAP_INTERVAL 5    // Set the time interval between CoAP PUT messages
@@ -44,7 +40,7 @@
 #define PSK_KEY "\xdd\xbb\xba\x39\xda\xce\x95\xed\x12\x34\x56\x78\x90\xab\xcd\xef"
 #define PSK_KEY_LEN 16
 
-#define SERVER_IP "your server IP"
+#define SERVER_IP "77.23.124.146"
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
 
@@ -358,28 +354,7 @@ static int modem_configure(void)
 void setup_cert(WOLFSSL_CTX *ctx)
 {
         int ret;
-        const unsigned char *rootCA;
-        size_t rootCA_len;
-        const unsigned char *client_cert;
-        size_t client_cert_len;
-        const unsigned char *client_key;
-        size_t client_key_len;
-#ifdef USE_ECDSA
-        rootCA = rootCA1_der;
-        rootCA_len = rootCA1_der_len;
-        client_cert = client_cert_der;
-        client_cert_len = client_cert_der_len;
-        client_key = client_key_der;
-        client_key_len = client_key_der_len;
-#else
-        rootCA = rootCA2_der;
-        rootCA_len = rootCA2_der_len;
-        client_cert = client_cert2_der;
-        client_cert_len = client_cert2_der_len;
-        client_key = client_key2_der;
-        client_key_len = client_key2_der_len;
-#endif
-        ret = wolfSSL_CTX_load_verify_buffer_ex(ctx, rootCA, rootCA_len, WOLFSSL_FILETYPE_ASN1, 0, (WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY));
+        ret = wolfSSL_CTX_load_verify_buffer_ex(ctx, rootCA1_der, rootCA1_der_len, WOLFSSL_FILETYPE_ASN1, 0, (WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY));
         if (ret == WOLFSSL_SUCCESS)
         {
                 LOG_INF("Root cert load success");
@@ -389,7 +364,7 @@ void setup_cert(WOLFSSL_CTX *ctx)
                 LOG_ERR("Root cert load failure: %s", wolfSSL_ERR_reason_error_string(ret));
         }
 
-        ret = wolfSSL_CTX_use_certificate_buffer(ctx, client_cert, client_cert_len, WOLFSSL_FILETYPE_ASN1);
+        ret = wolfSSL_CTX_use_certificate_buffer(ctx, client_cert_der, client_cert_der_len, WOLFSSL_FILETYPE_ASN1);
         if (ret == WOLFSSL_SUCCESS)
         {
                 LOG_INF(GREEN "Client cert load success" RESET);
@@ -399,7 +374,7 @@ void setup_cert(WOLFSSL_CTX *ctx)
                 LOG_ERR("Client cert load failure: %s", wolfSSL_ERR_reason_error_string(ret));
         }
 
-        ret = wolfSSL_CTX_use_PrivateKey_buffer(ctx, client_key, client_key_len, WOLFSSL_FILETYPE_ASN1);
+        ret = wolfSSL_CTX_use_PrivateKey_buffer(ctx, client_key_der, client_key_der_len, WOLFSSL_FILETYPE_ASN1);
         if (ret == WOLFSSL_SUCCESS)
         {
                 LOG_INF(GREEN "Client key load success" RESET);
