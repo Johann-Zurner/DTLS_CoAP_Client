@@ -1,3 +1,4 @@
 build*/
 .vscode/
 documentation/sequence-server.plantuml
+src/sequence-server.plantuml
