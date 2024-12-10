@@ -1,10 +1,10 @@
 @startuml DTLS_Server_Workflow
 skinparam backgroundColor LightGrey
 skinparam activity {
-  StartColor YellowGreen
-  EndColor Tomato
-  BackgroundColor White
-  ArrowColor Black
+    StartColor YellowGreen
+    EndColor Tomato
+    BackgroundColor White
+    ArrowColor Black
 }
 start
 
@@ -12,52 +12,61 @@ start
 :Initialize WolfSSL;
 
 if (Use PSK or Certificates?) then (PSK)
-  :Set PSK identity and key;
+    :Set PSK identity and key;
 else (Certificates)
-  :Load Root CA;
-  : Load server certificate and key;
+    :Load Root CA;
+    : Load server certificate and key;
 endif
 
 if (Use CID?) then (yes)
-  :Generate random CID;
-  :Enable CID for session;
+    :Generate random CID;
+    :Enable CID for session;
 else (no)
-  :Skip CID setup;
 endif
 
-:Perform DTLS handshake;
+:Accept DTLS handshake;
 if (Handshake successful?) then (yes)
-  while (Receiving packet)
-    :Inspect packet;
-    if (IP or port changed?) then (yes)
-      if (CID enabled?) then (yes)
-        :Verify received CID matches stored CID;
-        if (CID matches?) then (yes)
-          :Update DTLS context for new peer;
+    :Store client IP and port;
+    repeat
+        label receivepacket
+        :Receive encrypted packet;
+        if (CID enabled?) then (yes)
+            :Compare stored IP with that of packet;
+            if (IP or port changed?) then (yes)
+                :Extract CID from packet;
+                :Verify received CID matches stored CID;
+                if (CID matches?) then (yes)
+                    :Accept message;
+                    :Update DTLS context to new IP;
+                else (no)
+                    label shutdown
+                    :Shutdown session;
+                    stop
+                endif
+            else (no)
+            endif
+            :Read and decrypt data using WolfSSL;
+            :Parse received CoAP message;
+            if (CoAP message is confirmable?) then (yes)
+                :Extract Message ID and Token;
+                :Construct and send CoAP acknowledgment;
+            else (no)
+                :Handle non-confirmable CoAP message;
+            endif
         else (no)
-          :Terminate session and reset handshake;
-          stop
+            :Compare stored IP with that of packet;
+            if (IP or port changed?) then (yes)
+                :Reset DTLS session;
+                :Update DTLS context to new IP;
+                :Accept new DTLS handshake;
+            else (no)
+            endif
         endif
-      else (no)
-        :Terminate session due to IP/port change;
-        stop
-      endif
-    endif
-
-    :Read data using WolfSSL;
-    :Parse received CoAP message;
-
-    if (CoAP message is confirmable?) then (yes)
-      :Extract Message ID and Token;
-      :Construct and send CoAP acknowledgment;
-    else (no)
-      :Handle non-confirmable CoAP message;
-    endif
-  endwhile
+    repeat while
+    detach
 else (no)
-  :Log handshake failure;
+    :Log handshake failure;
+    :Shutdown DTLS session;
+    stop
 endif
-
-:Cleanup DTLS session and resources;
-stop
 @enduml

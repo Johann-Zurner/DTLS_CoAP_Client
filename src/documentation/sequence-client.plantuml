@@ -16,7 +16,7 @@ if (LTE connection established?) then (yes)
 
   if (Use PSK or Certificates?) then (PSK)
     :Set up PSK identity and key;
-    :Enable PSK callback;
+    :Enable PSK;
   else (Certificates)
     :Load root CA;
     :Load client certificate and key;
@@ -25,15 +25,16 @@ if (LTE connection established?) then (yes)
   if (Use CID?) then (yes)
     :Enable CID for session;
   else (no)
-    :Skip CID setup;
+
   endif
 
-  :Perform DTLS handshake;
+  :Start DTLS handshake;
   if (Handshake successful?) then (yes)
     repeat
       :Initialize Confirmable CoAP PUT message;
       :Add Message ID and Token to CoAP message;
-      :Send CoAP message over DTLS;
+      :Encrypt and send CoAP message with WolfSSL;
+      :Await response;
       if (CoAP ACK received within timeout?) then (yes)
         :Verify CoAP ACK;
       else (no)
@@ -41,10 +42,9 @@ if (LTE connection established?) then (yes)
         :Start new DTLS Handshake;
       endif
     repeat while (CoAP messages remaining to be sent?) is (yes)
-    :Shutdown DTLS session;
   else (no)
-    :Log handshake failure;
   endif
+    :Shutdown DTLS session;
 else (no)
   :Log LTE connection failure;
 endif
