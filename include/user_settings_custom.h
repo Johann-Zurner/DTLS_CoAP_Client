@@ -31,7 +31,10 @@ extern "C"
 #define NO_WRITEV
 #define WC_RSA_PSS
 #define HAVE_AESGCM
-#define WOLFSSL_STATIC_PSK
+//#define WOLFSSL_STATIC_PSK
+//#define HAVE_CHACHA
+#define HAVE_POLY1305
+#define HAVE_RPK
 
 #define NO_OLD_TLS
 
@@ -60,8 +63,6 @@ extern "C"
 #define WOLFSSL_HAVE_PSA
 #define WC_PSA_CRYPTO
 */
-//#define HAVE_CHACHA
-//#define HAVE_POLY1305
 #ifdef __cplusplus
 }
 #endif

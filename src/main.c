@@ -20,12 +20,12 @@
 #include "client-cert-der.h"
 #include "client-key-der.h"
 
-#define USE_CID   // Comment out to NOT use Connection ID
-//#define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-// #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
-#define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
-#define COAP_INTERVAL 5    // Set the time interval between CoAP PUT messages
-#define COAP_MAX 50        // Set the maximum number of CoAP messages before DTLS session shuts down
+//#define USE_CID   // Comment out to NOT use Connection ID
+#define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
+//#define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
+//#define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
+#define COAP_INTERVAL 7    // Set the time interval between CoAP PUT messages
+#define COAP_MAX 500        // Set the maximum number of CoAP messages before DTLS session shuts down
 
 #define LED0_NODE DT_ALIAS(led0) // LED0_NODE = led0 defined in the .dts file; Lights up when DTLS Handshake is successfull
 
@@ -46,7 +46,7 @@
 
 /* Choose the Zephyr log level
 e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
 
 // Used for WolfSSL custom logging to add timestamps to each log output
 void CustomLoggingCallback(const int logLevel, const char *const logMessage);
@@ -112,7 +112,7 @@ int main(void)
         wolfSSL_CTX_use_psk_identity_hint(ctx, PSK_IDENTITY);
         wolfSSL_CTX_set_psk_client_callback(ctx, my_psk_client_callback);
 #endif
-
+        //wolfSSL_CTX_set_cipher_list(ctx, "DHE-PSK-AES128-CBC-SHA256"); //Force specific ciphers
         ssl = wolfSSL_new(ctx);
 
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
@@ -121,7 +121,7 @@ int main(void)
 #ifdef USE_CID
         cid = wolfSSL_dtls_cid_use(ssl);
 #endif
-        wolfSSL_dtls_set_timeout_init(ssl, 3);
+        wolfSSL_dtls_set_timeout_init(ssl, 4);
 
         /* Perform DTLS connection */
         if (wolfSSL_connect(ssl) != WOLFSSL_SUCCESS)
@@ -134,7 +134,7 @@ int main(void)
         else
         {
                 LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
-                dk_set_led_on(DK_LED2);
+                //dk_set_led_on(DK_LED2);
         }
 
         ret = wolfSSL_dtls_cid_is_enabled(ssl);
@@ -152,6 +152,7 @@ int main(void)
         n = COAP_MAX;
         while (true)
         {
+                
                 int temperature = 1 + (k++);
                 if (temperature == 1000)
                 {
@@ -182,6 +183,7 @@ int main(void)
                 if (ret > 0 && (fds.revents & POLLIN))
                 {
                         ret = wolfSSL_read(ssl, receive_buffer, sizeof(receive_buffer) - 1);
+                        //k_sleep(K_SECONDS(5));
                         verify_coap_message(receive_buffer, ret);
                 }
                 else
