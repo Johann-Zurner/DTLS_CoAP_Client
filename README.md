@@ -65,7 +65,7 @@ This project implements a CoAP client that communicates securely using DTLS. The
    
    ![WhatsApp Bild 2024-12-05 um 01 02 48_49d84875](https://github.com/user-attachments/assets/0b5c3d51-0478-44a4-98ac-7df08fbffd5d)
 
-9. Now scroll down and click the `Build Configuration` button. No you can browse `main()`, `prj.conf`, `/include/user_settings_custom.h` and other relevant files.
+9. Now scroll down and click the `Build Configuration` button. Now you can browse `main()`, `prj.conf`, `/include/user_settings_custom.h` and other relevant files.
    Make sure to set your server IP address in `main()`.
    Click `Flash` to flash the code onto the board.
 
