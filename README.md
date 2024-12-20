@@ -59,12 +59,13 @@ This project implements a CoAP client that communicates securely using DTLS. The
       ![image](https://github.com/user-attachments/assets/0da0ce55-8733-4ffa-9537-78676742c32e)
 
 6. Clone this repository to your VS code environment
+7. Import it if necessary into visual studio code by clicking file/open_folder/
 
-7. Click `Add build configuration` and select as board target `nrf9160dk/nrf9160/ns`
+8. Click `Add build configuration` and select as board target `nrf9160dk/nrf9160/ns`
    
    ![WhatsApp Bild 2024-12-05 um 01 02 48_49d84875](https://github.com/user-attachments/assets/0b5c3d51-0478-44a4-98ac-7df08fbffd5d)
 
-8. Now scroll down and click the `Build Configuration` button. No you can browse `main()`, `prj.conf`, `/include/user_settings_custom.h` and other relevant files.
+9. Now scroll down and click the `Build Configuration` button. No you can browse `main()`, `prj.conf`, `/include/user_settings_custom.h` and other relevant files.
    Make sure to set your server IP address in `main()`.
    Click `Flash` to flash the code onto the board.
 
