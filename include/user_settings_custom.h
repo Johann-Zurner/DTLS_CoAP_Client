@@ -40,6 +40,7 @@ extern "C"
 
 #define HAVE_ECC
 #define HAVE_SUPPORTED_CURVES
+#define ECC_USER_CURVES
 #define ECC_MIN_KEY_SZ 160
 #undef NO_ASN_TIME //NO_ASN_TIME enables date checking for certs
 

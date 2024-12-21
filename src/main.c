@@ -20,12 +20,12 @@
 #include "client-cert-der.h"
 #include "client-key-der.h"
 
-//#define USE_CID   // Comment out to NOT use Connection ID
-#define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-//#define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
-//#define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
+// #define USE_CID   // Comment out to NOT use Connection ID
+// #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
+// #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
+#define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
 #define COAP_INTERVAL 7    // Set the time interval between CoAP PUT messages
-#define COAP_MAX 500        // Set the maximum number of CoAP messages before DTLS session shuts down
+#define COAP_MAX 500       // Set the maximum number of CoAP messages before DTLS session shuts down
 
 #define LED0_NODE DT_ALIAS(led0) // LED0_NODE = led0 defined in the .dts file; Lights up when DTLS Handshake is successfull
 
@@ -44,9 +44,14 @@
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
 
+#define GPIO_PORT "GPIO_0" // GPIO port on the nRF9160DK
+#define GPIO_PIN 13        // GPIO pin number (P0.13)
+#define GPIO_FLAGS GPIO_OUTPUT
+static const struct device *gpio_dev;
+
 /* Choose the Zephyr log level
 e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
 
 // Used for WolfSSL custom logging to add timestamps to each log output
 void CustomLoggingCallback(const int logLevel, const char *const logMessage);
@@ -78,6 +83,21 @@ int main(void)
         struct coap_packet coap_message;
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
+
+        /*gpio_dev = device_get_binding(GPIO_PORT);
+        if (!gpio_dev)
+        {
+                printk("Error: Couldn't find GPIO device\n");
+        }
+        gpio_pin_configure(gpio_dev, GPIO_PIN, GPIO_FLAGS);
+        while (1)
+        {
+                gpio_pin_set(gpio_dev, GPIO_PIN, 1);
+                k_sleep(K_MSEC(500));
+                gpio_pin_set(gpio_dev, GPIO_PIN, 0);
+                k_sleep(K_MSEC(500));
+        }*/
+
 #ifdef USE_DTLS_1_3
         WOLFSSL_METHOD *method = wolfDTLSv1_3_client_method();
 #else
@@ -108,15 +128,17 @@ int main(void)
 
 #ifdef USE_CERTS
         setup_cert(ctx);
+        wolfSSL_CTX_set_cipher_list(ctx, "TLS13-AES128-GCM-SHA256"); //Force specific ciphers
 #else
         wolfSSL_CTX_use_psk_identity_hint(ctx, PSK_IDENTITY);
         wolfSSL_CTX_set_psk_client_callback(ctx, my_psk_client_callback);
+        wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-PSK-AES128-GCM-SHA256"); //Force specific ciphers
 #endif
-        //wolfSSL_CTX_set_cipher_list(ctx, "DHE-PSK-AES128-CBC-SHA256"); //Force specific ciphers
         ssl = wolfSSL_new(ctx);
 
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
         wolfSSL_set_fd(ssl, sockfd);
+        wolfSSL_UseSupportedCurve(ssl,WOLFSSL_ECC_SECP256R1);
 
 #ifdef USE_CID
         cid = wolfSSL_dtls_cid_use(ssl);
@@ -134,7 +156,7 @@ int main(void)
         else
         {
                 LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
-                //dk_set_led_on(DK_LED2);
+                // dk_set_led_on(DK_LED2);
         }
 
         ret = wolfSSL_dtls_cid_is_enabled(ssl);
@@ -152,7 +174,7 @@ int main(void)
         n = COAP_MAX;
         while (true)
         {
-                
+
                 int temperature = 1 + (k++);
                 if (temperature == 1000)
                 {
@@ -183,7 +205,7 @@ int main(void)
                 if (ret > 0 && (fds.revents & POLLIN))
                 {
                         ret = wolfSSL_read(ssl, receive_buffer, sizeof(receive_buffer) - 1);
-                        //k_sleep(K_SECONDS(5));
+                        // k_sleep(K_SECONDS(5));
                         verify_coap_message(receive_buffer, ret);
                 }
                 else
@@ -397,7 +419,7 @@ void show_supported_ciphers()
 {
         uint8_t cipher_buffer[2048];
         wolfSSL_get_ciphers(cipher_buffer, BUFFER_SIZE);
-        for (char *p = (char *)cipher_buffer; *p; p++) //bring ":" separated list into readable format"
+        for (char *p = (char *)cipher_buffer; *p; p++) // bring ":" separated list into readable format"
         {
                 if (*p == ':')
                 {
