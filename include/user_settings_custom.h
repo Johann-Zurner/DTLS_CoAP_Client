@@ -36,6 +36,7 @@ extern "C"
 //#define HAVE_ED25519
 #define WOLFSSL_SHA512
 #define HAVE_RPK
+#define HAVE_CHACHA
 
 #define NO_OLD_TLS
 
