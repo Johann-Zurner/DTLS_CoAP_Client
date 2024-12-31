@@ -45,10 +45,11 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
 
-#define PROFILER_PORT "GPIO_0" // GPIO port on the nRF9160DK
-#define PROFILER_PIN 13        // GPIO pin number (P0.13)
-#define PROFILER_FLAGS GPIO_OUTPUT_ACTIVE
-// static const struct gpio_dt_spec profiler_pin = GPIO_DT_SPEC_GET(DT_ALIAS(profiler), gpios);
+static const struct gpio_dt_spec profiler_pin = {
+    .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
+    .pin = 10,                                  // Pin number
+    .dt_flags = GPIO_OUTPUT_INACTIVE            // Initial state (inactive)
+};
 
 /* Choose the Zephyr log level
 e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
@@ -86,23 +87,6 @@ int main(void)
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
         const struct device *gpio_dev;
-
-        /*gpio_dev = device_get_binding(PROFILER_PORT);
-        if (!gpio_dev)
-        {
-                printk("Error: Couldn't find GPIO device\n");
-        }
-        gpio_pin_configure(gpio_dev, PROFILER_PIN, PROFILER_FLAGS);
-        while (1)
-        {
-                gpio_pin_set(gpio_dev, GPIO_PIN, 1);
-                k_sleep(K_MSEC(500));
-                gpio_pin_set(gpio_dev, GPIO_PIN, 0);
-                k_sleep(K_MSEC(500));
-        }
-        gpio_pin_set(gpio_dev, PROFILER_PIN, 1);
-        k_msleep(1000); // Keep it active for 1 second
-        gpio_pin_set(gpio_dev, PROFILER_PIN, 0);*/
 
         InitMemoryTracker();
 #ifdef USE_DTLS_1_3
@@ -161,9 +145,13 @@ int main(void)
 #endif
         wolfSSL_dtls_set_timeout_init(ssl, 4);
         ShowMemoryTracker();
-        InitMemoryTracker();
+        LOG_INF("GPIO-Pin set? %d", device_is_ready(profiler_pin.port));
+        gpio_pin_configure_dt(&profiler_pin, GPIO_OUTPUT_ACTIVE);
         // monitor_memory_usage();
         /* Perform DTLS connection */
+        printf("Set GPIO pin high\n");
+        gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
+        InitMemoryTracker();
         if (wolfSSL_connect(ssl) != WOLFSSL_SUCCESS)
         {
                 err = wolfSSL_get_error(ssl, 0);
@@ -174,6 +162,8 @@ int main(void)
         {
                 LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
                 ShowMemoryTracker();
+                LOG_INF(GREEN "Set GPIO pin low\n" RESET);
+                gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
         }
         ret = wolfSSL_dtls_cid_is_enabled(ssl);
         if (ret == WOLFSSL_SUCCESS)
@@ -190,6 +180,8 @@ int main(void)
         n = COAP_MAX;
         while (true)
         {
+                LOG_INF(GREEN "Set GPIO pin high\n" RESET);
+                gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
                 InitMemoryTracker();
                 int temperature = 1 + (k++);
                 if (temperature == 1000)
@@ -244,10 +236,14 @@ int main(void)
                         }
                         else
                         {
+                                LOG_INF(GREEN "Set GPIO pin low\n" RESET);
+                                gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
                                 ShowMemoryTracker();
                                 continue;
                         }
                 }
+                LOG_INF(GREEN "Set GPIO pin low\n" RESET);
+		gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
                 ShowMemoryTracker();
                 k_sleep(K_SECONDS(COAP_INTERVAL));
                 n--;
