@@ -31,9 +31,10 @@ extern "C"
 #define NO_WRITEV
 #define WC_RSA_PSS
 #define HAVE_AESGCM
-//#define WOLFSSL_STATIC_PSK
-//#define HAVE_CHACHA
 #define HAVE_POLY1305
+#define HAVE_CURVE25519
+//#define HAVE_ED25519
+#define WOLFSSL_SHA512
 #define HAVE_RPK
 
 #define NO_OLD_TLS
@@ -41,7 +42,7 @@ extern "C"
 #define HAVE_ECC
 #define HAVE_SUPPORTED_CURVES
 #define ECC_USER_CURVES
-#define ECC_MIN_KEY_SZ 160
+#define ECC_MIN_KEY_SZ 128
 #undef NO_ASN_TIME //NO_ASN_TIME enables date checking for certs
 
     /*Optional Hardening Options against Blinding and Side-Channel attacks - slows down DTLS handshake)*/
@@ -51,11 +52,9 @@ extern "C"
 
 // experimental
 //#define WOLFSSL_ARMASM
-#define HAVE_ENCRYPT_THEN_MAC
 
 // #define WOLFSSL_NO_RSA
 /*
-#define HAVE_XCHACHA
 #define WOLFSSL_CUSTOM_CURVES
 #define WOLFSSL_RNG
 #define WOLFSSL_RAND_GEN
@@ -64,6 +63,15 @@ extern "C"
 #define WOLFSSL_HAVE_PSA
 #define WC_PSA_CRYPTO
 */
+#define WOLFSSL_HWCRYPTO
+//#define WOLFSSL_CRYPTOCELL
+#include <pthread.h>
+
+extern pthread_mutex_t memLock; // Declare memLock as extern
+#define WOLFSSL_TRACK_MEMORY
+//#define WOLFSSL_TRACK_MEMORY_VERBOSE
+//#define WOLFSSL_DEBUG_MEMORY
+
 #ifdef __cplusplus
 }
 #endif

@@ -3,13 +3,15 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/coap.h>
-#include <dk_buttons_and_leds.h>
 #include <modem/nrf_modem_lib.h>
 #include <modem/lte_lc.h>
 #include <wolfssl/ssl.h>
 
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/net/coap.h>
+
+pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
+#include <wolfssl/wolfcrypt/mem_track.h>
 
 /*Include the header file for the socket API */
 #include <zephyr/net/socket.h>
@@ -23,9 +25,9 @@
 // #define USE_CID   // Comment out to NOT use Connection ID
 // #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
 // #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
-#define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
-#define COAP_INTERVAL 7    // Set the time interval between CoAP PUT messages
-#define COAP_MAX 500       // Set the maximum number of CoAP messages before DTLS session shuts down
+// #define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
+#define COAP_INTERVAL 7 // Set the time interval between CoAP PUT messages
+#define COAP_MAX 500    // Set the maximum number of CoAP messages before DTLS session shuts down
 
 #define LED0_NODE DT_ALIAS(led0) // LED0_NODE = led0 defined in the .dts file; Lights up when DTLS Handshake is successfull
 
@@ -35,7 +37,6 @@
 #define RESET "\033[0m"
 
 #define COAP_MAX_PDU_SIZE 128
-// #define PSK_KEY "ddbbba39dace95ed"
 #define PSK_IDENTITY "Client_identity"
 #define PSK_KEY "\xdd\xbb\xba\x39\xda\xce\x95\xed\x12\x34\x56\x78\x90\xab\xcd\xef"
 #define PSK_KEY_LEN 16
@@ -44,18 +45,19 @@
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
 
-#define GPIO_PORT "GPIO_0" // GPIO port on the nRF9160DK
-#define GPIO_PIN 13        // GPIO pin number (P0.13)
-#define GPIO_FLAGS GPIO_OUTPUT
-static const struct device *gpio_dev;
+#define PROFILER_PORT "GPIO_0" // GPIO port on the nRF9160DK
+#define PROFILER_PIN 13        // GPIO pin number (P0.13)
+#define PROFILER_FLAGS GPIO_OUTPUT_ACTIVE
+// static const struct gpio_dt_spec profiler_pin = GPIO_DT_SPEC_GET(DT_ALIAS(profiler), gpios);
 
 /* Choose the Zephyr log level
 e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
 
 // Used for WolfSSL custom logging to add timestamps to each log output
 void CustomLoggingCallback(const int logLevel, const char *const logMessage);
 
+void monitor_memory_usage();
 // Verify received CoAP messages, i.e. read type of message (e.g. confirmable) and extract and print Token and Message_ID
 void verify_coap_message(uint8_t *receive_buffer, int ret);
 
@@ -83,21 +85,26 @@ int main(void)
         struct coap_packet coap_message;
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
+        const struct device *gpio_dev;
 
-        /*gpio_dev = device_get_binding(GPIO_PORT);
+        /*gpio_dev = device_get_binding(PROFILER_PORT);
         if (!gpio_dev)
         {
                 printk("Error: Couldn't find GPIO device\n");
         }
-        gpio_pin_configure(gpio_dev, GPIO_PIN, GPIO_FLAGS);
+        gpio_pin_configure(gpio_dev, PROFILER_PIN, PROFILER_FLAGS);
         while (1)
         {
                 gpio_pin_set(gpio_dev, GPIO_PIN, 1);
                 k_sleep(K_MSEC(500));
                 gpio_pin_set(gpio_dev, GPIO_PIN, 0);
                 k_sleep(K_MSEC(500));
-        }*/
+        }
+        gpio_pin_set(gpio_dev, PROFILER_PIN, 1);
+        k_msleep(1000); // Keep it active for 1 second
+        gpio_pin_set(gpio_dev, PROFILER_PIN, 0);*/
 
+        InitMemoryTracker();
 #ifdef USE_DTLS_1_3
         WOLFSSL_METHOD *method = wolfDTLSv1_3_client_method();
 #else
@@ -128,37 +135,46 @@ int main(void)
 
 #ifdef USE_CERTS
         setup_cert(ctx);
-        wolfSSL_CTX_set_cipher_list(ctx, "TLS13-AES128-GCM-SHA256"); //Force specific ciphers
+#ifdef USE_DTLS_1_3
+        wolfSSL_CTX_set_cipher_list(ctx, "TLS13-AES128-GCM-SHA256"); // Force specific DTLS 1.3 ciphers
+#else
+        wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force specific DTLS 1.2 ciphers
+#endif
 #else
         wolfSSL_CTX_use_psk_identity_hint(ctx, PSK_IDENTITY);
         wolfSSL_CTX_set_psk_client_callback(ctx, my_psk_client_callback);
-        wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-PSK-AES128-GCM-SHA256"); //Force specific ciphers
+#ifdef USE_DTLS_1_3
+        wolfSSL_CTX_set_cipher_list(ctx, "TLS13-AES128-GCM-SHA256"); // Force specific DTLS 1.3 PSK ciphers
+#else
+        wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-PSK-AES128-GCM-SHA256"); // Force specific DTLS 1.2 PSK ciphers
+#endif
 #endif
         ssl = wolfSSL_new(ctx);
 
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
         wolfSSL_set_fd(ssl, sockfd);
-        wolfSSL_UseSupportedCurve(ssl,WOLFSSL_ECC_SECP256R1);
+        wolfSSL_UseSupportedCurve(ssl, WOLFSSL_ECC_SECP256R1);
+        wolfSSL_UseSupportedCurve(ssl, WOLFSSL_ECC_X25519);
 
 #ifdef USE_CID
         cid = wolfSSL_dtls_cid_use(ssl);
 #endif
         wolfSSL_dtls_set_timeout_init(ssl, 4);
-
+        ShowMemoryTracker();
+        InitMemoryTracker();
+        // monitor_memory_usage();
         /* Perform DTLS connection */
         if (wolfSSL_connect(ssl) != WOLFSSL_SUCCESS)
         {
                 err = wolfSSL_get_error(ssl, 0);
                 LOG_ERR("wolfSSL_connect failed %d, %s", err, wolfSSL_ERR_reason_error_string(err));
-                dk_set_led_on(DK_LED1);
                 goto cleanup;
         }
         else
         {
                 LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
-                // dk_set_led_on(DK_LED2);
+                ShowMemoryTracker();
         }
-
         ret = wolfSSL_dtls_cid_is_enabled(ssl);
         if (ret == WOLFSSL_SUCCESS)
         {
@@ -174,7 +190,7 @@ int main(void)
         n = COAP_MAX;
         while (true)
         {
-
+                InitMemoryTracker();
                 int temperature = 1 + (k++);
                 if (temperature == 1000)
                 {
@@ -210,7 +226,7 @@ int main(void)
                 }
                 else
                 {
-                        LOG_INF(GREEN "No Ack received, assuming IP change, retry DTLS Handshake" RESET);
+                        LOG_WRN(GREEN "No Ack received, assuming IP change, retry DTLS Handshake" RESET);
                         wolfSSL_free(ssl);
                         ssl = wolfSSL_new(ctx);
                         wolfSSL_set_fd(ssl, sockfd);
@@ -220,7 +236,6 @@ int main(void)
                         {
                                 wolfSSL_dtls_cid_use(ssl);
                         }
-
                         ret = wolfSSL_connect(ssl);
                         if (ret != WOLFSSL_SUCCESS)
                         {
@@ -229,9 +244,11 @@ int main(void)
                         }
                         else
                         {
+                                ShowMemoryTracker();
                                 continue;
                         }
                 }
+                ShowMemoryTracker();
                 k_sleep(K_SECONDS(COAP_INTERVAL));
                 n--;
                 if (n == 0)
@@ -247,7 +264,7 @@ cleanup:
 
                 if (ret == WOLFSSL_SHUTDOWN_NOT_DONE)
                 {
-                        LOG_INF(GREEN "Waiting for peer close notify response" RESET);
+                        LOG_WRN("Waiting for peer close notify response");
 
                         int retry_count = 0;
                         const int max_retries = 50; // Adjust as needed
@@ -370,8 +387,6 @@ static int modem_configure(void)
 
         k_sem_take(&lte_connected, K_FOREVER);
         LOG_INF("Connected to LTE network");
-        dk_leds_init();
-
         return 0;
 }
 
