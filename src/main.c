@@ -53,7 +53,7 @@ static const struct gpio_dt_spec profiler_pin = {
 
 /* Choose the Zephyr log level
 e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
 
 // Used for WolfSSL custom logging to add timestamps to each log output
 void CustomLoggingCallback(const int logLevel, const char *const logMessage);
@@ -74,6 +74,7 @@ static int modem_configure(void);
 
 void setup_cert(WOLFSSL_CTX *ctx);
 void show_supported_ciphers();
+struct coap_packet create_coap_message(int *tempgrowth);
 
 int main(void)
 {
@@ -81,12 +82,9 @@ int main(void)
         static struct sockaddr_in serverAddr;
         int ret, err, n;
         int cid = -1;
-        uint8_t send_buffer[BUFFER_SIZE];
         uint8_t receive_buffer[BUFFER_SIZE];
-        struct coap_packet coap_message;
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
-        const struct device *gpio_dev;
 
         InitMemoryTracker();
 #ifdef USE_DTLS_1_3
@@ -145,11 +143,10 @@ int main(void)
 #endif
         wolfSSL_dtls_set_timeout_init(ssl, 4);
         ShowMemoryTracker();
-        LOG_INF("GPIO-Pin set? %d", device_is_ready(profiler_pin.port));
+        LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin.port));
         gpio_pin_configure_dt(&profiler_pin, GPIO_OUTPUT_ACTIVE);
-        // monitor_memory_usage();
         /* Perform DTLS connection */
-        printf("Set GPIO pin high\n");
+        LOG_INF(GREEN "Set GPIO pin high. First Handshake\n" RESET);
         gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
         InitMemoryTracker();
         if (wolfSSL_connect(ssl) != WOLFSSL_SUCCESS)
@@ -162,7 +159,7 @@ int main(void)
         {
                 LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
                 ShowMemoryTracker();
-                LOG_INF(GREEN "Set GPIO pin low\n" RESET);
+                LOG_INF(GREEN "Set GPIO pin low. After first handshake\n" RESET);
                 gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
         }
         ret = wolfSSL_dtls_cid_is_enabled(ssl);
@@ -176,28 +173,14 @@ int main(void)
                 LOG_INF(GREEN "CID not enabled" RESET);
         }
 
-        int k = 0;
+        int tempgrowth = 0;
         n = COAP_MAX;
         while (true)
         {
-                LOG_INF(GREEN "Set GPIO pin high\n" RESET);
+                LOG_INF(GREEN "Set GPIO pin high. Before sending CoAP\n" RESET);
                 gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
                 InitMemoryTracker();
-                int temperature = 1 + (k++);
-                if (temperature == 1000)
-                {
-                        temperature = 1;
-                }
-                LOG_INF(GREEN "Temperature: %d degrees" RESET, temperature);
-                coap_packet_init(&coap_message, send_buffer, sizeof(send_buffer), 1, COAP_TYPE_CON, 1, coap_next_token(), COAP_METHOD_PUT, coap_next_id());
-                coap_packet_append_payload_marker(&coap_message);
-                char payload[16];
-                snprintf(payload, sizeof(payload), "%d", temperature); // Format the temperature as a string
-                coap_packet_append_payload(&coap_message, (uint8_t *)payload, strlen(payload));
-                LOG_HEXDUMP_DBG(payload, strlen(payload), GREEN "Payload" RESET);
-
-                LOG_HEXDUMP_DBG(send_buffer, coap_message.offset, GREEN "coapmessage: " RESET);
-                LOG_INF("Sent message ID: %d", coap_header_get_id(&coap_message));
+                struct coap_packet coap_message = create_coap_message(&tempgrowth);
                 ret = wolfSSL_write(ssl, coap_message.data, coap_message.offset);
                 if (ret <= 0)
                 {
@@ -213,7 +196,6 @@ int main(void)
                 if (ret > 0 && (fds.revents & POLLIN))
                 {
                         ret = wolfSSL_read(ssl, receive_buffer, sizeof(receive_buffer) - 1);
-                        // k_sleep(K_SECONDS(5));
                         verify_coap_message(receive_buffer, ret);
                 }
                 else
@@ -228,7 +210,11 @@ int main(void)
                         {
                                 wolfSSL_dtls_cid_use(ssl);
                         }
+                        LOG_INF(GREEN "Set GPIO pin low\n" RESET);
+                        gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
                         ret = wolfSSL_connect(ssl);
+                        LOG_INF(GREEN "Set GPIO pin high\n" RESET);
+                        gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
                         if (ret != WOLFSSL_SUCCESS)
                         {
                                 LOG_ERR("Handshake failed");
@@ -243,7 +229,7 @@ int main(void)
                         }
                 }
                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
-		gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
+                gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
                 ShowMemoryTracker();
                 k_sleep(K_SECONDS(COAP_INTERVAL));
                 n--;
@@ -297,6 +283,27 @@ cleanup:
         wolfSSL_Cleanup();
 
         return 0;
+}
+
+struct coap_packet create_coap_message(int *tempgrowth)
+{
+        int temperature = 1 + (*tempgrowth)++;
+        if (temperature == 1000)
+        {
+                *tempgrowth = 0;
+        }
+        LOG_INF(GREEN "Temperature: %d degrees" RESET, temperature);
+        struct coap_packet coap_message;
+        uint8_t send_buffer[BUFFER_SIZE];
+        coap_packet_init(&coap_message, send_buffer, sizeof(send_buffer), 1, COAP_TYPE_CON, 1, coap_next_token(), COAP_METHOD_PUT, coap_next_id());
+        coap_packet_append_payload_marker(&coap_message);
+        char payload[16];
+        snprintf(payload, sizeof(payload), "%d", temperature); // Format the temperature as a string
+        coap_packet_append_payload(&coap_message, (uint8_t *)payload, strlen(payload));
+        LOG_HEXDUMP_DBG(payload, strlen(payload), GREEN "Payload" RESET);
+        LOG_HEXDUMP_DBG(send_buffer, coap_message.offset, GREEN "coapmessage: " RESET);
+        LOG_INF("Sent message ID: %d", coap_header_get_id(&coap_message));
+        return coap_message;
 }
 
 void verify_coap_message(uint8_t *receive_buffer, int ret)
