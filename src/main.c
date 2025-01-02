@@ -25,7 +25,7 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 // #define USE_CID   // Comment out to NOT use Connection ID
 // #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
 // #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
-// #define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
+#define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
 #define COAP_INTERVAL 7 // Set the time interval between CoAP PUT messages
 #define COAP_MAX 500    // Set the maximum number of CoAP messages before DTLS session shuts down
 
@@ -74,7 +74,7 @@ static int modem_configure(void);
 
 void setup_cert(WOLFSSL_CTX *ctx);
 void show_supported_ciphers();
-struct coap_packet create_coap_message(int *tempgrowth);
+struct coap_packet create_coap_message(int *tempgrowth, uint8_t *send_buffer, size_t buffer_size);
 
 int main(void)
 {
@@ -83,6 +83,7 @@ int main(void)
         int ret, err, n;
         int cid = -1;
         uint8_t receive_buffer[BUFFER_SIZE];
+        uint8_t send_buffer[BUFFER_SIZE];
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
 
@@ -180,7 +181,7 @@ int main(void)
                 LOG_INF(GREEN "Set GPIO pin high. Before sending CoAP\n" RESET);
                 gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
                 InitMemoryTracker();
-                struct coap_packet coap_message = create_coap_message(&tempgrowth);
+                struct coap_packet coap_message = create_coap_message(&tempgrowth, send_buffer, sizeof(send_buffer));
                 ret = wolfSSL_write(ssl, coap_message.data, coap_message.offset);
                 if (ret <= 0)
                 {
@@ -285,7 +286,7 @@ cleanup:
         return 0;
 }
 
-struct coap_packet create_coap_message(int *tempgrowth)
+struct coap_packet create_coap_message(int *tempgrowth, uint8_t *send_buffer, size_t buffer_size)
 {
         int temperature = 1 + (*tempgrowth)++;
         if (temperature == 1000)
@@ -294,8 +295,7 @@ struct coap_packet create_coap_message(int *tempgrowth)
         }
         LOG_INF(GREEN "Temperature: %d degrees" RESET, temperature);
         struct coap_packet coap_message;
-        uint8_t send_buffer[BUFFER_SIZE];
-        coap_packet_init(&coap_message, send_buffer, sizeof(send_buffer), 1, COAP_TYPE_CON, 1, coap_next_token(), COAP_METHOD_PUT, coap_next_id());
+        coap_packet_init(&coap_message, send_buffer, buffer_size, 1, COAP_TYPE_CON, 1, coap_next_token(), COAP_METHOD_PUT, coap_next_id());
         coap_packet_append_payload_marker(&coap_message);
         char payload[16];
         snprintf(payload, sizeof(payload), "%d", temperature); // Format the temperature as a string
