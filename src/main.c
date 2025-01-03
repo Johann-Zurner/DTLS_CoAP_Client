@@ -25,11 +25,10 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 // #define USE_CID   // Comment out to NOT use Connection ID
 // #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
 // #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
-#define SHOW_WOLFSSL_DEBUG // Comment out to not see WolfSSL Debug logs including timestamps
-#define COAP_INTERVAL 7 // Set the time interval between CoAP PUT messages
-#define COAP_MAX 500    // Set the maximum number of CoAP messages before DTLS session shuts down
-
-#define LED0_NODE DT_ALIAS(led0) // LED0_NODE = led0 defined in the .dts file; Lights up when DTLS Handshake is successfull
+// #define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
+#define MEMORY_DEBUG_SHOW // Comment out to NOT see memory debug
+#define COAP_INTERVAL 7   // Set the time interval between CoAP PUT messages
+#define COAP_MAX 500      // Set the maximum number of CoAP messages before DTLS session shuts down
 
 /* These lines are for adding colors to debug output */
 #define GREEN "\033[32m"
@@ -53,12 +52,11 @@ static const struct gpio_dt_spec profiler_pin = {
 
 /* Choose the Zephyr log level
 e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
 
 // Used for WolfSSL custom logging to add timestamps to each log output
 void CustomLoggingCallback(const int logLevel, const char *const logMessage);
 
-void monitor_memory_usage();
 // Verify received CoAP messages, i.e. read type of message (e.g. confirmable) and extract and print Token and Message_ID
 void verify_coap_message(uint8_t *receive_buffer, int ret);
 
@@ -87,7 +85,7 @@ int main(void)
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
 
-        InitMemoryTracker();
+        gpio_pin_configure_dt(&profiler_pin, GPIO_OUTPUT_INACTIVE);
 #ifdef USE_DTLS_1_3
         WOLFSSL_METHOD *method = wolfDTLSv1_3_client_method();
 #else
@@ -136,20 +134,21 @@ int main(void)
 
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
         wolfSSL_set_fd(ssl, sockfd);
-        wolfSSL_UseSupportedCurve(ssl, WOLFSSL_ECC_SECP256R1);
         wolfSSL_UseSupportedCurve(ssl, WOLFSSL_ECC_X25519);
+        //wolfSSL_UseSupportedCurve(ssl, WOLFSSL_ECC_SECP256R1);
 
 #ifdef USE_CID
         cid = wolfSSL_dtls_cid_use(ssl);
 #endif
         wolfSSL_dtls_set_timeout_init(ssl, 4);
-        ShowMemoryTracker();
         LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin.port));
-        gpio_pin_configure_dt(&profiler_pin, GPIO_OUTPUT_ACTIVE);
         /* Perform DTLS connection */
+        k_sleep(K_SECONDS(3));
         LOG_INF(GREEN "Set GPIO pin high. First Handshake\n" RESET);
         gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
+#ifdef MEMORY_DEBUG_SHOW
         InitMemoryTracker();
+#endif
         if (wolfSSL_connect(ssl) != WOLFSSL_SUCCESS)
         {
                 err = wolfSSL_get_error(ssl, 0);
@@ -158,10 +157,12 @@ int main(void)
         }
         else
         {
-                LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
-                ShowMemoryTracker();
-                LOG_INF(GREEN "Set GPIO pin low. After first handshake\n" RESET);
                 gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
+                LOG_INF(GREEN "Set GPIO pin low. After first handshake\n" RESET);
+                LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
+#ifdef MEMORY_DEBUG_SHOW
+                ShowMemoryTracker();
+#endif
         }
         ret = wolfSSL_dtls_cid_is_enabled(ssl);
         if (ret == WOLFSSL_SUCCESS)
@@ -176,11 +177,14 @@ int main(void)
 
         int tempgrowth = 0;
         n = COAP_MAX;
+        k_sleep(K_SECONDS(3));
         while (true)
         {
                 LOG_INF(GREEN "Set GPIO pin high. Before sending CoAP\n" RESET);
                 gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
+#ifdef MEMORY_DEBUG_SHOW
                 InitMemoryTracker();
+#endif
                 struct coap_packet coap_message = create_coap_message(&tempgrowth, send_buffer, sizeof(send_buffer));
                 ret = wolfSSL_write(ssl, coap_message.data, coap_message.offset);
                 if (ret <= 0)
@@ -211,11 +215,11 @@ int main(void)
                         {
                                 wolfSSL_dtls_cid_use(ssl);
                         }
-                        LOG_INF(GREEN "Set GPIO pin low\n" RESET);
-                        gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
+                        //LOG_INF(GREEN "Set GPIO pin low\n" RESET);
+                        // gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
                         ret = wolfSSL_connect(ssl);
-                        LOG_INF(GREEN "Set GPIO pin high\n" RESET);
-                        gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
+                        //LOG_INF(GREEN "Set GPIO pin high\n" RESET);
+                        // gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
                         if (ret != WOLFSSL_SUCCESS)
                         {
                                 LOG_ERR("Handshake failed");
@@ -225,13 +229,17 @@ int main(void)
                         {
                                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
                                 gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
+#ifdef MEMORY_DEBUG_SHOW
                                 ShowMemoryTracker();
+#endif
                                 continue;
                         }
                 }
                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
                 gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
+#ifdef MEMORY_DEBUG_SHOW
                 ShowMemoryTracker();
+#endif
                 k_sleep(K_SECONDS(COAP_INTERVAL));
                 n--;
                 if (n == 0)
