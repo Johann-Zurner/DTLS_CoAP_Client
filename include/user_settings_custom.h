@@ -36,7 +36,6 @@ extern "C"
 //#define HAVE_ED25519
 #define WOLFSSL_SHA512
 #define HAVE_RPK
-#define HAVE_CHACHA
 
 #define NO_OLD_TLS
 
@@ -47,9 +46,9 @@ extern "C"
 #undef NO_ASN_TIME //NO_ASN_TIME enables date checking for certs
 
     /*Optional Hardening Options against Blinding and Side-Channel attacks - slows down DTLS handshake)*/
-    // #define TFM_TIMING_RESISTANT
-    // #define ECC_TIMING_RESISTANT
-    // #define WC_RSA_BLINDING
+    //#define TFM_TIMING_RESISTANT
+    //#define ECC_TIMING_RESISTANT
+    //#define WC_RSA_BLINDING
 
 // experimental
 //#define WOLFSSL_ARMASM

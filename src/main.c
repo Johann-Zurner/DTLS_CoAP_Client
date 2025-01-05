@@ -22,13 +22,13 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #include "client-cert-der.h"
 #include "client-key-der.h"
 
-// #define USE_CID   // Comment out to NOT use Connection ID
-// #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-// #define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
+//#define USE_CID // Comment out to NOT use Connection ID
+#define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
+//#define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
 // #define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
 #define MEMORY_DEBUG_SHOW // Comment out to NOT see memory debug
 #define COAP_INTERVAL 7   // Set the time interval between CoAP PUT messages
-#define COAP_MAX 500      // Set the maximum number of CoAP messages before DTLS session shuts down
+#define COAP_MAX 20       // Set the maximum number of CoAP messages before DTLS session shuts down
 
 /* These lines are for adding colors to debug output */
 #define GREEN "\033[32m"
@@ -44,10 +44,16 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
 
-static const struct gpio_dt_spec profiler_pin = {
+static const struct gpio_dt_spec profiler_pin_10 = {
     .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
-    .pin = 10,                                  // Pin number
-    .dt_flags = GPIO_OUTPUT_INACTIVE            // Initial state (inactive)
+    .pin = 10,                                  // Pin number 10
+    .dt_flags = (uint16_t)GPIO_OUTPUT_INACTIVE            // Initial state (inactive)
+};
+
+static const struct gpio_dt_spec profiler_pin_11 = {
+    .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
+    .pin = 11,                                  // Pin number 11
+    .dt_flags = (uint16_t)GPIO_OUTPUT_INACTIVE            // Initial state (inactive)
 };
 
 /* Choose the Zephyr log level
@@ -85,7 +91,8 @@ int main(void)
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
 
-        gpio_pin_configure_dt(&profiler_pin, GPIO_OUTPUT_INACTIVE);
+        gpio_pin_configure_dt(&profiler_pin_10, GPIO_OUTPUT_INACTIVE);
+        gpio_pin_configure_dt(&profiler_pin_11, GPIO_OUTPUT_INACTIVE);
 #ifdef USE_DTLS_1_3
         WOLFSSL_METHOD *method = wolfDTLSv1_3_client_method();
 #else
@@ -134,18 +141,19 @@ int main(void)
 
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
         wolfSSL_set_fd(ssl, sockfd);
-        wolfSSL_UseSupportedCurve(ssl, WOLFSSL_ECC_X25519);
-        //wolfSSL_UseSupportedCurve(ssl, WOLFSSL_ECC_SECP256R1);
+        //wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519);
+        wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_SECP256R1);
 
 #ifdef USE_CID
         cid = wolfSSL_dtls_cid_use(ssl);
 #endif
         wolfSSL_dtls_set_timeout_init(ssl, 4);
-        LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin.port));
+        LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin_10.port));
+        device_is_ready(profiler_pin_11.port);
         /* Perform DTLS connection */
         k_sleep(K_SECONDS(3));
         LOG_INF(GREEN "Set GPIO pin high. First Handshake\n" RESET);
-        gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
+        gpio_pin_set(profiler_pin_10.port, profiler_pin_11.pin, 1); // Turn GPIO ON
 #ifdef MEMORY_DEBUG_SHOW
         InitMemoryTracker();
 #endif
@@ -157,8 +165,8 @@ int main(void)
         }
         else
         {
-                gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
-                LOG_INF(GREEN "Set GPIO pin low. After first handshake\n" RESET);
+                gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 0); // Turn GPIO OFF
+                LOG_INF(GREEN "Set GPIO pin 11 low. After first handshake\n" RESET);
                 LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
 #ifdef MEMORY_DEBUG_SHOW
                 ShowMemoryTracker();
@@ -177,11 +185,13 @@ int main(void)
 
         int tempgrowth = 0;
         n = COAP_MAX;
-        k_sleep(K_SECONDS(3));
         while (true)
         {
                 LOG_INF(GREEN "Set GPIO pin high. Before sending CoAP\n" RESET);
-                gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
+                if (gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin) != 1)
+                {
+                        gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 1); // Turn GPIO ON
+                }
 #ifdef MEMORY_DEBUG_SHOW
                 InitMemoryTracker();
 #endif
@@ -215,11 +225,11 @@ int main(void)
                         {
                                 wolfSSL_dtls_cid_use(ssl);
                         }
-                        //LOG_INF(GREEN "Set GPIO pin low\n" RESET);
-                        // gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
+                        LOG_INF(GREEN "Set GPIO pin 11 high\n" RESET);
+                        gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 1); // Turn GPIO ON
                         ret = wolfSSL_connect(ssl);
-                        //LOG_INF(GREEN "Set GPIO pin high\n" RESET);
-                        // gpio_pin_set(profiler_pin.port, profiler_pin.pin, 1); // Turn GPIO ON
+                        LOG_INF(GREEN "Set GPIO pin low\n" RESET);
+                        gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 0); // Turn GPIO OFF
                         if (ret != WOLFSSL_SUCCESS)
                         {
                                 LOG_ERR("Handshake failed");
@@ -228,7 +238,7 @@ int main(void)
                         else
                         {
                                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
-                                gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
+                                // gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 0); // Turn GPIO OFF
 #ifdef MEMORY_DEBUG_SHOW
                                 ShowMemoryTracker();
 #endif
@@ -236,55 +246,53 @@ int main(void)
                         }
                 }
                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
-                gpio_pin_set(profiler_pin.port, profiler_pin.pin, 0); // Turn GPIO OFF
+                gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 0); // Turn GPIO OFF
 #ifdef MEMORY_DEBUG_SHOW
                 ShowMemoryTracker();
 #endif
-                k_sleep(K_SECONDS(COAP_INTERVAL));
                 n--;
                 if (n == 0)
                 {
-                        break;
+                        goto cleanup;
                 }
+                k_sleep(K_SECONDS(COAP_INTERVAL));
         }
 
 cleanup:
-        if (ssl != NULL)
+
+        ret = wolfSSL_shutdown(ssl);
+
+        if (ret == WOLFSSL_SHUTDOWN_NOT_DONE)
         {
-                ret = wolfSSL_shutdown(ssl);
+                LOG_WRN("Waiting for peer close notify response");
 
-                if (ret == WOLFSSL_SHUTDOWN_NOT_DONE)
+                int retry_count = 0;
+                const int max_retries = 50; // Adjust as needed
+
+                // Wait for the server's close_notify without resending one
+                while (ret == WOLFSSL_SHUTDOWN_NOT_DONE && retry_count < max_retries)
                 {
-                        LOG_WRN("Waiting for peer close notify response");
-
-                        int retry_count = 0;
-                        const int max_retries = 50; // Adjust as needed
-
-                        // Wait for the server's close_notify without resending one
-                        while (ret == WOLFSSL_SHUTDOWN_NOT_DONE && retry_count < max_retries)
-                        {
-                                k_sleep(K_MSEC(100));        // Wait for 100 ms before checking again
-                                ret = wolfSSL_shutdown(ssl); // Check the status of the shutdown, do not resend close_notify
-                                retry_count++;
-                        }
+                        k_sleep(K_MSEC(100));        // Wait for 100 ms before checking again
+                        ret = wolfSSL_shutdown(ssl); // Check the status of the shutdown, do not resend close_notify
+                        retry_count++;
                 }
-
-                if (ret == 0)
-                {
-                        LOG_INF(GREEN "Shutdown success" RESET);
-                }
-                else if (ret == 1)
-                {
-                        LOG_INF(GREEN "Shutdown complete, peer sent close notify" RESET);
-                }
-                else
-                {
-                        err = wolfSSL_get_error(ssl, ret);
-                        LOG_ERR("Shutdown failed: err = %d, %s", err, wolfSSL_ERR_reason_error_string(err));
-                }
-
-                wolfSSL_free(ssl);
         }
+
+        if (ret == 0)
+        {
+                LOG_INF(GREEN "Shutdown success" RESET);
+        }
+        else if (ret == 1)
+        {
+                LOG_INF(GREEN "Shutdown complete, peer sent close notify" RESET);
+        }
+        else
+        {
+                err = wolfSSL_get_error(ssl, ret);
+                LOG_ERR("Shutdown failed: err = %d, %s", err, wolfSSL_ERR_reason_error_string(err));
+        }
+
+        wolfSSL_free(ssl);
 
         close(sockfd);
         if (ctx != NULL)
