@@ -153,7 +153,7 @@ int main(void)
         LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin_11.port));
         /* Perform DTLS connection */
         gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 1); // Turn GPIO ON
-        LOG_INF(GREEN "Set GPIO pin high. First Handshake\n" RESET);
+        LOG_INF(GREEN "Set GPIO pin 11 high. First Handshake\n" RESET);
 
 #ifdef MEMORY_DEBUG_SHOW
         InitMemoryTracker();
@@ -167,8 +167,8 @@ int main(void)
         else
         {
                 gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 0); // Turn GPIO OFF
-                LOG_INF(GREEN "Set GPIO pin 11 low. After first handshake\n" RESET);
                 LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
+                LOG_INF(GREEN "Set GPIO pin 11 low. After first handshake\n" RESET);
 #ifdef MEMORY_DEBUG_SHOW
                 ShowMemoryTracker();
 #endif
@@ -188,15 +188,12 @@ int main(void)
         n = COAP_MAX;
         while (true)
         {
-                printf("right after while, pin?%d\n", gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin));
                 if (gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin) != 1)
                 {
-                        LOG_INF(GREEN "Set GPIO pin high. Before sending CoAP\n" RESET);
+                        LOG_INF(GREEN "Set GPIO pin 10 high. Before sending CoAP\n" RESET);
                         gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 1); // Turn GPIO ON
-                        printf("pin high now?%d\n", gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin));
 #ifdef MEMORY_DEBUG_SHOW
                         LOG_INF(GREEN "Memory Tracker init\n" RESET);
-                        printf("Memory Tracker init\n");
                         InitMemoryTracker();
 #endif
                 }
@@ -249,9 +246,8 @@ int main(void)
                 }
                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
                 gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 0); // Turn GPIO OFF
-                printf("pin low?%d\n", gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin));
 #ifdef MEMORY_DEBUG_SHOW
-                printf("Memory Tracker show\n");
+                LOG_INF(GREEN "Memory Tracker show\n" RESET);
                 ShowMemoryTracker();
 #endif
                 n--;
@@ -464,5 +460,5 @@ void show_supported_ciphers()
                         *p = '\n';
                 }
         }
-        printf("Enabled Ciphers:\n%s\n", cipher_buffer);
+        LOG_INF("Enabled Ciphers:\n%s\n", cipher_buffer);
 }
