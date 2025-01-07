@@ -22,12 +22,12 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #include "client-cert-der.h"
 #include "client-key-der.h"
 
-//#define USE_CID // Comment out to NOT use Connection ID
+// #define USE_CID // Comment out to NOT use Connection ID
 #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-//#define USE_DTLS_1_3       // Comment out to use DTLS 1.2 instead of 1.3
-// #define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
+// #define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
+//  #define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
 #define MEMORY_DEBUG_SHOW // Comment out to NOT see memory debug
-#define COAP_INTERVAL 7   // Set the time interval between CoAP PUT messages
+#define COAP_INTERVAL 6   // Set the time interval between CoAP PUT messages
 #define COAP_MAX 20       // Set the maximum number of CoAP messages before DTLS session shuts down
 
 /* These lines are for adding colors to debug output */
@@ -47,13 +47,13 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 static const struct gpio_dt_spec profiler_pin_10 = {
     .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
     .pin = 10,                                  // Pin number 10
-    .dt_flags = (uint16_t)GPIO_OUTPUT_INACTIVE            // Initial state (inactive)
+    .dt_flags = (uint16_t)GPIO_OUTPUT_INACTIVE  // Initial state (inactive)
 };
 
 static const struct gpio_dt_spec profiler_pin_11 = {
     .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
     .pin = 11,                                  // Pin number 11
-    .dt_flags = (uint16_t)GPIO_OUTPUT_INACTIVE            // Initial state (inactive)
+    .dt_flags = (uint16_t)GPIO_OUTPUT_INACTIVE  // Initial state (inactive)
 };
 
 /* Choose the Zephyr log level
@@ -91,8 +91,9 @@ int main(void)
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
 
-        gpio_pin_configure_dt(&profiler_pin_10, GPIO_OUTPUT_INACTIVE);
-        gpio_pin_configure_dt(&profiler_pin_11, GPIO_OUTPUT_INACTIVE);
+        gpio_pin_configure_dt(&profiler_pin_10, GPIO_OUTPUT_INACTIVE | GPIO_INPUT);
+        gpio_pin_configure_dt(&profiler_pin_11, GPIO_OUTPUT_INACTIVE | GPIO_INPUT);
+
 #ifdef USE_DTLS_1_3
         WOLFSSL_METHOD *method = wolfDTLSv1_3_client_method();
 #else
@@ -141,7 +142,7 @@ int main(void)
 
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
         wolfSSL_set_fd(ssl, sockfd);
-        //wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519);
+        // wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519);
         wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_SECP256R1);
 
 #ifdef USE_CID
@@ -149,11 +150,11 @@ int main(void)
 #endif
         wolfSSL_dtls_set_timeout_init(ssl, 4);
         LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin_10.port));
-        device_is_ready(profiler_pin_11.port);
+        LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin_11.port));
         /* Perform DTLS connection */
-        k_sleep(K_SECONDS(3));
+        gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 1); // Turn GPIO ON
         LOG_INF(GREEN "Set GPIO pin high. First Handshake\n" RESET);
-        gpio_pin_set(profiler_pin_10.port, profiler_pin_11.pin, 1); // Turn GPIO ON
+
 #ifdef MEMORY_DEBUG_SHOW
         InitMemoryTracker();
 #endif
@@ -187,14 +188,18 @@ int main(void)
         n = COAP_MAX;
         while (true)
         {
-                LOG_INF(GREEN "Set GPIO pin high. Before sending CoAP\n" RESET);
+                printf("right after while, pin?%d\n", gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin));
                 if (gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin) != 1)
                 {
+                        LOG_INF(GREEN "Set GPIO pin high. Before sending CoAP\n" RESET);
                         gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 1); // Turn GPIO ON
-                }
+                        printf("pin high now?%d\n", gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin));
 #ifdef MEMORY_DEBUG_SHOW
-                InitMemoryTracker();
+                        LOG_INF(GREEN "Memory Tracker init\n" RESET);
+                        printf("Memory Tracker init\n");
+                        InitMemoryTracker();
 #endif
+                }
                 struct coap_packet coap_message = create_coap_message(&tempgrowth, send_buffer, sizeof(send_buffer));
                 ret = wolfSSL_write(ssl, coap_message.data, coap_message.offset);
                 if (ret <= 0)
@@ -239,15 +244,14 @@ int main(void)
                         {
                                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
                                 // gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 0); // Turn GPIO OFF
-#ifdef MEMORY_DEBUG_SHOW
-                                ShowMemoryTracker();
-#endif
                                 continue;
                         }
                 }
                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
                 gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 0); // Turn GPIO OFF
+                printf("pin low?%d\n", gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin));
 #ifdef MEMORY_DEBUG_SHOW
+                printf("Memory Tracker show\n");
                 ShowMemoryTracker();
 #endif
                 n--;
