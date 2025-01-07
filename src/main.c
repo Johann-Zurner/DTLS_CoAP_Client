@@ -240,7 +240,6 @@ int main(void)
                         else
                         {
                                 LOG_INF(GREEN "Set GPIO pin low\n" RESET);
-                                // gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 0); // Turn GPIO OFF
                                 continue;
                         }
                 }
