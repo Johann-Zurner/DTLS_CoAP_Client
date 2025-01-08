@@ -22,10 +22,10 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #include "client-cert-der.h"
 #include "client-key-der.h"
 
-// #define USE_CID // Comment out to NOT use Connection ID
+//#define USE_CID // Comment out to NOT use Connection ID
 #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-// #define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
-//  #define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
+#define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
+//#define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
 #define MEMORY_DEBUG_SHOW // Comment out to NOT see memory debug
 #define COAP_INTERVAL 6   // Set the time interval between CoAP PUT messages
 #define COAP_MAX 20       // Set the maximum number of CoAP messages before DTLS session shuts down
@@ -44,6 +44,10 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
 
+/* Choose the Zephyr log level
+e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
+
 static const struct gpio_dt_spec profiler_pin_10 = {
     .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
     .pin = 10,                                  // Pin number 10
@@ -56,9 +60,6 @@ static const struct gpio_dt_spec profiler_pin_11 = {
     .dt_flags = (uint16_t)GPIO_OUTPUT_INACTIVE  // Initial state (inactive)
 };
 
-/* Choose the Zephyr log level
-e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
 
 // Used for WolfSSL custom logging to add timestamps to each log output
 void CustomLoggingCallback(const int logLevel, const char *const logMessage);
@@ -142,7 +143,7 @@ int main(void)
 
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
         wolfSSL_set_fd(ssl, sockfd);
-        // wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519);
+        //wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519);
         wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_SECP256R1);
 
 #ifdef USE_CID
