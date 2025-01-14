@@ -24,8 +24,8 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 
 //#define USE_CID // Comment out to NOT use Connection ID
 #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-#define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
-//#define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
+//#define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
+#define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
 #define MEMORY_DEBUG_SHOW // Comment out to NOT see memory debug
 #define COAP_INTERVAL 6   // Set the time interval between CoAP PUT messages
 #define COAP_MAX 20       // Set the maximum number of CoAP messages before DTLS session shuts down
@@ -46,7 +46,7 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 
 /* Choose the Zephyr log level
 e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
 
 static const struct gpio_dt_spec profiler_pin_10 = {
     .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
