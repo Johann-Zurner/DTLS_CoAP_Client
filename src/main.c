@@ -1,3 +1,45 @@
+/*
+ * File: main.c
+ * Purpose: Implements a CoAP client over DTLS using the WolfSSL library.
+ *          The client periodically sends CoAP PUT requests to a server
+ *          and manages DTLS connection, including Connection ID for session persistence after IP or port change.
+ *
+ * Author: Johann Zürner
+ * Created: January 16, 2025
+ * Last Updated: January 16, 2025
+ *
+ * Description:
+ * This program establishes a secure DTLS session with a server and transmits CoAP Confirmable messages
+ * containing a simulated temperature value. The program supports DTLS 1.2 and 1.3 with optional
+ * Connection ID (CID). It handles IP changes mid-session when CID is enabled.
+ * Resets DTLS session when no ACK is received after a CoAP message.
+ * The GPIO pins are set to high during specific operations to profile the program
+ * with power consumption measurements.
+ *
+ * Key Features:
+ * - Support for DTLS 1.2 and 1.3 with configurable cipher suites and ecc curves.
+ * - Optional use of Connection ID for session persistence.
+ * - Secure CoAP communication with PSK or certificate-based authentication.
+ * - Debugging capabilities for WolfSSL, memory usage, and CoAP message details.
+ *
+ * Usage:
+ * - Configure the `SERVER_IP`, `SERVER_PORT`, and other constants as needed.
+ * - Set CID, certificate, and PSK options in the code as needed.
+ * - Build and run the program on a Nordic nRF9160 development board or in a Zephyr environment.
+ * - Observe logs to track DTLS session establishment, CoAP messages, and debugging details.
+ *
+ * Dependencies:
+ * - WolfSSL library
+ *
+ * Notes:
+ * - Ensure the certificates or PSK are correctly configured for the chosen authentication method.
+ * - Ensure the server is running and listening on the specified IP and port.
+ * - Ensure server has the correct certificates and PSK for client authentication.
+ * - Modify `COAP_INTERVAL` and `COAP_MAX` to control the frequency and count of CoAP messages.
+ *
+ * License:
+ * This code is released under the MIT License. See LICENSE file for details.
+ */
 #include <stdio.h>
 #include <ncs_version.h>
 #include <zephyr/kernel.h>
@@ -17,18 +59,19 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #include <zephyr/net/socket.h>
 /*inluded for CID randomization*/
 #include <zephyr/random/random.h>
+
 /*Includes the cert files in hex*/
 #include "rootCA1-der.h"
 #include "client-cert-der.h"
 #include "client-key-der.h"
 
-//#define USE_CID // Comment out to NOT use Connection ID
+// #define USE_CID // Comment out to NOT use Connection ID
 #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-//#define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
+// #define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
 #define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
-#define MEMORY_DEBUG_SHOW // Comment out to NOT see memory debug
-#define COAP_INTERVAL 6   // Set the time interval between CoAP PUT messages
-#define COAP_MAX 20       // Set the maximum number of CoAP messages before DTLS session shuts down
+#define MEMORY_DEBUG_SHOW  // Comment out to NOT see memory debug
+#define COAP_INTERVAL 6    // Set the time interval between CoAP PUT messages
+#define COAP_MAX 20        // Set the maximum number of CoAP messages before DTLS session shuts down
 
 /* These lines are for adding colors to debug output */
 #define GREEN "\033[32m"
@@ -45,7 +88,9 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #define BUFFER_SIZE 1024
 
 /* Choose the Zephyr log level
-e.g. LOG_LEVEL_INF will print only your LOG_INF statements, LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.) */
+ * e.g. LOG_LEVEL_INF will print only your LOG_INF statements
+ * LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.)
+ */
 LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
 
 static const struct gpio_dt_spec profiler_pin_10 = {
@@ -59,7 +104,6 @@ static const struct gpio_dt_spec profiler_pin_11 = {
     .pin = 11,                                  // Pin number 11
     .dt_flags = (uint16_t)GPIO_OUTPUT_INACTIVE  // Initial state (inactive)
 };
-
 
 // Used for WolfSSL custom logging to add timestamps to each log output
 void CustomLoggingCallback(const int logLevel, const char *const logMessage);
@@ -92,6 +136,7 @@ int main(void)
         WOLFSSL_CTX *ctx;
         WOLFSSL *ssl;
 
+        // Initialize GPIO pins; need also input mode to read them from PPK2
         gpio_pin_configure_dt(&profiler_pin_10, GPIO_OUTPUT_INACTIVE | GPIO_INPUT);
         gpio_pin_configure_dt(&profiler_pin_11, GPIO_OUTPUT_INACTIVE | GPIO_INPUT);
 
@@ -106,7 +151,7 @@ int main(void)
                 LOG_ERR("Failed to configure the modem");
                 return 0;
         }
-
+        // socket setup
         sockfd = socket(AF_INET, SOCK_DGRAM, 0);
         memset(&serverAddr, 0, sizeof(serverAddr));
         serverAddr.sin_family = AF_INET;
@@ -143,7 +188,7 @@ int main(void)
 
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
         wolfSSL_set_fd(ssl, sockfd);
-        //wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519);
+        // wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519);
         wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_SECP256R1);
 
 #ifdef USE_CID
@@ -198,6 +243,7 @@ int main(void)
                         InitMemoryTracker();
 #endif
                 }
+                // create and send coap PUT confirmable message
                 struct coap_packet coap_message = create_coap_message(&tempgrowth, send_buffer, sizeof(send_buffer));
                 ret = wolfSSL_write(ssl, coap_message.data, coap_message.offset);
                 if (ret <= 0)
@@ -206,6 +252,7 @@ int main(void)
                         LOG_ERR("Error during wolfSSL_write: %d", err);
                         break;
                 }
+                // wait for ACK for 5 seconds
                 struct pollfd fds;
                 fds.fd = wolfSSL_get_fd(ssl);
                 fds.events = POLLIN;
@@ -218,7 +265,9 @@ int main(void)
                 }
                 else
                 {
+                        // no ACK received after 5 seconds, assume IP change and retry DTLS handshake
                         LOG_WRN(GREEN "No Ack received, assuming IP change, retry DTLS Handshake" RESET);
+                        // wolfssl session needs to be reset and handshake started again
                         wolfSSL_free(ssl);
                         ssl = wolfSSL_new(ctx);
                         wolfSSL_set_fd(ssl, sockfd);
@@ -302,6 +351,7 @@ cleanup:
         return 0;
 }
 
+// creates a coap PUT Confirmable message with a simulated temperature value
 struct coap_packet create_coap_message(int *tempgrowth, uint8_t *send_buffer, size_t buffer_size)
 {
         int temperature = 1 + (*tempgrowth)++;
