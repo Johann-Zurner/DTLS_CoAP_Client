@@ -1,4 +1,4 @@
-t # CoAP Client with DTLS Support on Zephyr and WolfSSL
+# CoAP Client with DTLS Support on Zephyr and WolfSSL
 
 This project implements a CoAP client that communicates securely using DTLS. The client is designed to run on a Nordic board using the Zephyr RTOS. The whole setup is designed to test the functionality of Connection ID.
 
