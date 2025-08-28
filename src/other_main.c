@@ -23,7 +23,7 @@
  * - Debugging capabilities for WolfSSL, memory usage, and CoAP message details.
  *
  * Usage:
- * - Configure the SERVER_IP, SERVER_PORT, and other constants as needed.
+ * - Configure the `SERVER_IP`, `SERVER_PORT`, and other constants as needed.
  * - Set CID, certificate, and PSK options in the code as needed.
  * - Build and run the program on a Nordic nRF9160 development board or in a Zephyr environment.
  * - Observe logs to track DTLS session establishment, CoAP messages, and debugging details.
@@ -35,7 +35,7 @@
  * - Ensure the certificates or PSK are correctly configured for the chosen authentication method.
  * - Ensure the server is running and listening on the specified IP and port.
  * - Ensure server has the correct certificates and PSK for client authentication.
- * - Modify COAP_INTERVAL and COAP_MAX to control the frequency and count of CoAP messages.
+ * - Modify `COAP_INTERVAL` and `COAP_MAX` to control the frequency and count of CoAP messages.
  *
  * License:
  * This code is released under the MIT License. See LICENSE file for details.
@@ -57,22 +57,22 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 
 /*Include the header file for the socket API */
 #include <zephyr/net/socket.h>
-// inluded for CID randomization/
+/*inluded for CID randomization*/
 #include <zephyr/random/random.h>
 
-// Includes the cert files in hex/
+/*Includes the cert files in hex*/
 #include "rootCA1-der.h"
 #include "client-cert-der.h"
 #include "client-key-der.h"
 
 // #define USE_CID // Comment out to NOT use Connection ID
 #define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-#define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
-// #define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
+//#define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
+#define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
 #define MEMORY_DEBUG_SHOW  // Comment out to NOT see memory debug
-#define COAP_INTERVAL 6 // Set the time interval between CoAP PUT messages
-#define COAP_MAX 20     // Set the maximum number of CoAP messages before DTLS session shuts down
-#define USE_IPv4        // Comment out to use IPv6 instead of IPv4
+#define COAP_INTERVAL 6    // Set the time interval between CoAP PUT messages
+#define COAP_MAX 20        // Set the maximum number of CoAP messages before DTLS session shuts down
+#define USE_IPv4 // Comment out to use IPv6 instead of IPv4
 
 /* These lines are for adding colors to debug output */
 #define GREEN "\033[32m"
@@ -80,55 +80,20 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #define RESET "\033[0m"
 
 #define COAP_MAX_PDU_SIZE 128
-#define PSK_IDENTITY_128 "Client_identity_128_Bit"
-#define PSK_IDENTITY_256 "Client_identity_256_Bit"
-#define PSK_KEY_128 "\xdd\xbb\xba\x39\xda\xce\x95\xed\x12\x34\x56\x78\x90\xab\xcd\xef"
-#define PSK_KEY_LEN_128 16
-#define PSK_KEY_256 "\x7a\x1c\x9e\x45\x23\xb0\xdf\x82\x11\x6f\xa4\x39\x5c\x8d\x77\xea" \
-                    "\x4b\x92\x0f\x6a\xd8\x35\xbc\x19\xfe\x63\x2e\xab\x50\xc7\x84\xdd"
-#define PSK_KEY_LEN_256 32
+#define PSK_IDENTITY "Client_identity"
+#define PSK_KEY "\xdd\xbb\xba\x39\xda\xce\x95\xed\x12\x34\x56\x78\x90\xab\xcd\xef"
+#define PSK_KEY_LEN 16
 
-#define USE_PSK_256 0 // set to 0 for 16-byte key
-
-#if USE_PSK_256
-#define PSK_IDENTITY PSK_IDENTITY_256
-#define PSK_KEY PSK_KEY_256
-#define PSK_KEY_LEN PSK_KEY_LEN_256
-#else
-#define PSK_IDENTITY PSK_IDENTITY_128
-#define PSK_KEY PSK_KEY_128
-#define PSK_KEY_LEN PSK_KEY_LEN_128
-#endif
-
-#define SERVER_IP "87.79.235.251"
-#define SERVER_IPv6 "2a0a:a54a:b18d::a00:27ff:fea4:55db" // IPv6 address
+#define SERVER_IPv4 "195.14.205.6" //IPv4 address
+#define SERVER_IPv6 "2001:67c:2b0:0:0:0:0:1" // IPv6 address
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
-
-#define WOLFSSL_KEYSHARE_GROUP WOLFSSL_X25519MLKEM512
-/*
-WOLFSSL_ML_KEM_768         // works
-WOLFSSL_ML_KEM_1024      // Client sends no key;
-WOLFSSL_X25519MLKEM768    // works without the curve??
-WOLFSSL_SECP521R1MLKEM1024 // bad function argument
-WOLFSSL_SECP384R1MLKEM1024 // bad function argument
-WOLFSSL_X448MLKEM768      // bad function argument
-WOLFSSL_SECP256R1MLKEM768  // Client sends no key; Missing extension
-WOLFSSL_SECP384R1MLKEM768  // bad function argument
-WOLFSSL_X25519MLKEM512
-WOLFSSL_ML_KEM_512         // works
-WOLFSSL_SECP256R1MLKEM512 //  works
-WOLFSSL_ECC_SECP256R1
-WOLFSSL_ECC_X25519
-*/
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
 
 /* Choose the Zephyr log level
  * e.g. LOG_LEVEL_INF will print only your LOG_INF statements
  * LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.)
  */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
 
 static const struct gpio_dt_spec profiler_pin_10 = {
     .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
@@ -195,14 +160,15 @@ int main(void)
         memset(&serverAddr, 0, sizeof(serverAddr));
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(SERVER_PORT);
-        inet_pton(AF_INET, SERVER_IP, &serverAddr.sin_addr);
-#else
+        inet_pton(AF_INET, SERVER_IPv4, &serverAddr.sin_addr);
+#else 
         sockfd = socket(AF_INET6, SOCK_DGRAM, 0);
         memset(&serverAddr6, 0, sizeof(serverAddr6));
         serverAddr6.sin6_family = AF_INET6;
         serverAddr6.sin6_port = htons(SERVER_PORT);
         inet_pton(AF_INET6, SERVER_IPv6, &serverAddr6.sin6_addr);
 #endif
+
         wolfSSL_Init();
 
 #ifdef SHOW_WOLFSSL_DEBUG
@@ -218,7 +184,7 @@ int main(void)
 #ifdef USE_DTLS_1_3
         wolfSSL_CTX_set_cipher_list(ctx, "TLS13-AES128-GCM-SHA256"); // Force specific DTLS 1.3 ciphers
 #else
-wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force specific DTLS 1.2 ciphers
+        wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force specific DTLS 1.2 ciphers
 #endif
 #else
         wolfSSL_CTX_use_psk_identity_hint(ctx, PSK_IDENTITY);
@@ -234,26 +200,24 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
 #else
         wolfSSL_dtls_set_peer(ssl, &serverAddr6, sizeof(serverAddr6));
-#endif
         wolfSSL_set_fd(ssl, sockfd);
-        int rc1 = wolfSSL_UseSupportedCurve(ssl, WOLFSSL_KEYSHARE_GROUP);
-        int rc2 = wolfSSL_UseKeyShare(ssl, WOLFSSL_KEYSHARE_GROUP);
-        //LOG_INF("UseSupportedCurve=%d UseKeyShare=%d", rc1, rc2);
+        // wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519);
+        wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_SECP256R1);
+#endif
 
 #ifdef USE_CID
         cid = wolfSSL_dtls_cid_use(ssl);
 #endif
         wolfSSL_dtls_set_timeout_init(ssl, 4);
-        LOG_DBG(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin_10.port));
-        LOG_DBG(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin_11.port));
+        LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin_10.port));
+        LOG_INF(GREEN "GPIO-Pin set? %d" RESET, device_is_ready(profiler_pin_11.port));
         /* Perform DTLS connection */
         gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 1); // Turn GPIO ON
-        LOG_DBG(GREEN "Set GPIO pin 11 high. First Handshake\n" RESET);
+        LOG_INF(GREEN "Set GPIO pin 11 high. First Handshake\n" RESET);
 
 #ifdef MEMORY_DEBUG_SHOW
         InitMemoryTracker();
 #endif
-        uint32_t t0 = k_uptime_get_32();
         if (wolfSSL_connect(ssl) != WOLFSSL_SUCCESS)
         {
                 err = wolfSSL_get_error(ssl, 0);
@@ -262,11 +226,9 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
         }
         else
         {
-                uint32_t t1 = k_uptime_get_32();
-                LOG_INF(GREEN "1st Handshake ms=%u; Key Exchange =%s", (unsigned)(t1 - t0), STR(WOLFSSL_KEYSHARE_GROUP));
                 gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 0); // Turn GPIO OFF
-                LOG_DBG(GREEN "mwolfSSL handshake successful" RESET);
-                LOG_DBG(GREEN "Set GPIO pin 11 low. After first handshake\n" RESET);
+                LOG_INF(GREEN "mwolfSSL handshake successful" RESET);
+                LOG_INF(GREEN "Set GPIO pin 11 low. After first handshake\n" RESET);
 #ifdef MEMORY_DEBUG_SHOW
                 ShowMemoryTracker();
 #endif
@@ -274,12 +236,12 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
         ret = wolfSSL_dtls_cid_is_enabled(ssl);
         if (ret == WOLFSSL_SUCCESS)
         {
-                LOG_DBG(GREEN "CID enabled" RESET);
+                LOG_INF(GREEN "CID enabled" RESET);
         }
         else
         {
                 err = wolfSSL_get_error(ssl, 0);
-                LOG_DBG(GREEN "CID not enabled" RESET);
+                LOG_INF(GREEN "CID not enabled" RESET);
         }
 
         int tempgrowth = 0;
@@ -288,10 +250,10 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
         {
                 if (gpio_pin_get(profiler_pin_10.port, profiler_pin_10.pin) != 1)
                 {
-                        LOG_DBG(GREEN "Set GPIO pin 10 high. Before sending CoAP\n" RESET);
+                        LOG_INF(GREEN "Set GPIO pin 10 high. Before sending CoAP\n" RESET);
                         gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 1); // Turn GPIO ON
 #ifdef MEMORY_DEBUG_SHOW
-                        LOG_DBG(GREEN "Memory Tracker init\n" RESET);
+                        LOG_INF(GREEN "Memory Tracker init\n" RESET);
                         InitMemoryTracker();
 #endif
                 }
@@ -318,30 +280,21 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
                 else
                 {
                         // no ACK received after 5 seconds, assume IP change and retry DTLS handshake
-                        LOG_DBG(GREEN "No Ack received, assuming IP change, retry DTLS Handshake" RESET);
+                        LOG_WRN(GREEN "No Ack received, assuming IP change, retry DTLS Handshake" RESET);
                         // wolfssl session needs to be reset and handshake started again
                         wolfSSL_free(ssl);
                         ssl = wolfSSL_new(ctx);
-                        wolfSSL_UseKeyShare(ssl, WOLFSSL_KEYSHARE_GROUP); // works
-
                         wolfSSL_set_fd(ssl, sockfd);
-#ifdef USE_IPv4
                         wolfSSL_dtls_set_peer(ssl, &serverAddr, sizeof(serverAddr));
-#else
-                        wolfSSL_dtls_set_peer(ssl, &serverAddr6, sizeof(serverAddr6));
-#endif
                         wolfSSL_dtls_set_timeout_init(ssl, 3);
                         if (cid == WOLFSSL_SUCCESS)
                         {
                                 wolfSSL_dtls_cid_use(ssl);
                         }
-                        LOG_DBG(GREEN "Set GPIO pin 11 high\n" RESET);
+                        LOG_INF(GREEN "Set GPIO pin 11 high\n" RESET);
                         gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 1); // Turn GPIO ON
-                        uint32_t t0 = k_uptime_get_32();
                         ret = wolfSSL_connect(ssl);
-                        uint32_t t1 = k_uptime_get_32();
-                        LOG_INF(GREEN "Handshake ms=%u; Key Exchange=%s", (unsigned)(t1 - t0), STR(WOLFSSL_KEYSHARE_GROUP));
-                        LOG_DBG(GREEN "Set GPIO pin low\n" RESET);
+                        LOG_INF(GREEN "Set GPIO pin low\n" RESET);
                         gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 0); // Turn GPIO OFF
                         if (ret != WOLFSSL_SUCCESS)
                         {
@@ -350,14 +303,14 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
                         }
                         else
                         {
-                                LOG_DBG(GREEN "Set GPIO pin low\n" RESET);
+                                LOG_INF(GREEN "Set GPIO pin low\n" RESET);
                                 continue;
                         }
                 }
-                LOG_DBG(GREEN "Set GPIO pin low\n" RESET);
+                LOG_INF(GREEN "Set GPIO pin low\n" RESET);
                 gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 0); // Turn GPIO OFF
 #ifdef MEMORY_DEBUG_SHOW
-                LOG_DBG(GREEN "Memory Tracker show\n" RESET);
+                LOG_INF(GREEN "Memory Tracker show\n" RESET);
                 ShowMemoryTracker();
 #endif
                 n--;
@@ -390,11 +343,11 @@ cleanup:
 
         if (ret == 0)
         {
-                LOG_DBG(GREEN "Shutdown success" RESET);
+                LOG_INF(GREEN "Shutdown success" RESET);
         }
         else if (ret == 1)
         {
-                LOG_DBG(GREEN "Shutdown complete, peer sent close notify" RESET);
+                LOG_INF(GREEN "Shutdown complete, peer sent close notify" RESET);
         }
         else
         {
@@ -420,7 +373,7 @@ struct coap_packet create_coap_message(int *tempgrowth, uint8_t *send_buffer, si
         {
                 *tempgrowth = 0;
         }
-        LOG_DBG(GREEN "Temperature: %d degrees" RESET, temperature);
+        LOG_INF(GREEN "Temperature: %d degrees" RESET, temperature);
         struct coap_packet coap_message;
         coap_packet_init(&coap_message, send_buffer, buffer_size, 1, COAP_TYPE_CON, 1, coap_next_token(), COAP_METHOD_PUT, coap_next_id());
         coap_packet_append_payload_marker(&coap_message);
@@ -429,7 +382,7 @@ struct coap_packet create_coap_message(int *tempgrowth, uint8_t *send_buffer, si
         coap_packet_append_payload(&coap_message, (uint8_t *)payload, strlen(payload));
         LOG_HEXDUMP_DBG(payload, strlen(payload), GREEN "Payload" RESET);
         LOG_HEXDUMP_DBG(send_buffer, coap_message.offset, GREEN "coapmessage: " RESET);
-        LOG_DBG("Sent message ID: %d", coap_header_get_id(&coap_message));
+        LOG_INF("Sent message ID: %d", coap_header_get_id(&coap_message));
         return coap_message;
 }
 
@@ -447,11 +400,11 @@ void verify_coap_message(uint8_t *receive_buffer, int ret)
         uint8_t type = coap_header_get_type(&response);
         if (type == COAP_TYPE_ACK)
         {
-                LOG_DBG("Received CoAP ACK");
+                LOG_INF("Received CoAP ACK");
         }
         else
         {
-                LOG_DBG("Received non-ACK CoAP message (type: %d)", type);
+                LOG_INF("Received non-ACK CoAP message (type: %d)", type);
         }
         uint8_t token[8];
         uint8_t token_len = coap_header_get_token(&response, token);
@@ -459,7 +412,7 @@ void verify_coap_message(uint8_t *receive_buffer, int ret)
 
         // Get the message ID
         uint16_t message_id = coap_header_get_id(&response);
-        LOG_DBG(GREEN "Received Message ID in Ack: %d" RESET, message_id);
+        LOG_INF(GREEN "Received Message ID in Ack: %d" RESET, message_id);
         return;
 }
 
@@ -482,12 +435,12 @@ static void lte_handler(const struct lte_lc_evt *const evt)
                 {
                         break;
                 }
-                LOG_DBG("Network registration status: %s",
+                LOG_INF("Network registration status: %s",
                         evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME ? "Connected - home network" : "Connected - roaming");
                 k_sem_give(&lte_connected);
                 break;
         case LTE_LC_EVT_RRC_UPDATE:
-                LOG_DBG("RRC mode: %s", evt->rrc_mode == LTE_LC_RRC_MODE_CONNECTED ? "Connected" : "Idle");
+                LOG_INF("RRC mode: %s", evt->rrc_mode == LTE_LC_RRC_MODE_CONNECTED ? "Connected" : "Idle");
                 break;
         default:
                 break;
@@ -498,7 +451,7 @@ static int modem_configure(void)
 {
         int err;
 
-        LOG_DBG("Initializing modem library");
+        LOG_INF("Initializing modem library");
 
         err = nrf_modem_lib_init();
         if (err)
@@ -507,7 +460,7 @@ static int modem_configure(void)
                 return err;
         }
 
-        LOG_DBG("Connecting to LTE network");
+        LOG_INF("Connecting to LTE network");
         err = lte_lc_connect_async(lte_handler);
         if (err)
         {
@@ -516,7 +469,7 @@ static int modem_configure(void)
         }
 
         k_sem_take(&lte_connected, K_FOREVER);
-        LOG_DBG("Connected to LTE network");
+        LOG_INF("Connected to LTE network");
         return 0;
 }
 
@@ -526,7 +479,7 @@ void setup_cert(WOLFSSL_CTX *ctx)
         ret = wolfSSL_CTX_load_verify_buffer_ex(ctx, rootCA1_der, rootCA1_der_len, WOLFSSL_FILETYPE_ASN1, 0, (WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY));
         if (ret == WOLFSSL_SUCCESS)
         {
-                LOG_DBG("Root cert load success");
+                LOG_INF("Root cert load success");
         }
         else
         {
@@ -536,7 +489,7 @@ void setup_cert(WOLFSSL_CTX *ctx)
         ret = wolfSSL_CTX_use_certificate_buffer(ctx, client_cert_der, client_cert_der_len, WOLFSSL_FILETYPE_ASN1);
         if (ret == WOLFSSL_SUCCESS)
         {
-                LOG_DBG(GREEN "Client cert load success" RESET);
+                LOG_INF(GREEN "Client cert load success" RESET);
         }
         else
         {
@@ -546,7 +499,7 @@ void setup_cert(WOLFSSL_CTX *ctx)
         ret = wolfSSL_CTX_use_PrivateKey_buffer(ctx, client_key_der, client_key_der_len, WOLFSSL_FILETYPE_ASN1);
         if (ret == WOLFSSL_SUCCESS)
         {
-                LOG_DBG(GREEN "Client key load success" RESET);
+                LOG_INF(GREEN "Client key load success" RESET);
         }
         else
         {
@@ -557,7 +510,7 @@ void setup_cert(WOLFSSL_CTX *ctx)
 
 void CustomLoggingCallback(const int logLevel, const char *const logMessage)
 {
-        LOG_DBG("WolfSSL: %s", logMessage);
+        LOG_INF("WolfSSL: %s", logMessage);
 }
 
 void show_supported_ciphers()
@@ -571,5 +524,5 @@ void show_supported_ciphers()
                         *p = '\n';
                 }
         }
-        LOG_DBG("Enabled Ciphers:\n%s\n", cipher_buffer);
+        LOG_INF("Enabled Ciphers:\n%s\n", cipher_buffer);
 }
