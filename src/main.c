@@ -65,14 +65,48 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #include "client-cert-der.h"
 #include "client-key-der.h"
 
-// #define USE_CID // Comment out to NOT use Connection ID
-#define USE_CERTS // Comment out to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
-#define USE_DTLS_1_3 // Comment out to use DTLS 1.2 instead of 1.3
-// #define SHOW_WOLFSSL_DEBUG // Comment out to NOT see WolfSSL Debug logs including timestamps
-#define MEMORY_DEBUG_SHOW  // Comment out to NOT see memory debug
+// Set to 0 to NOT use Connection ID
+#define USE_CID 0 
+// Set to 0 to use Pre Shared Keys instead of Certificate verification (don't forget same on server side)
+#define USE_CERTS 0
+// Set to 0 to use DTLS 1.2 instead of 1.3
+#define USE_DTLS_1_3 1
+// Set to 0 to NOT see WolfSSL Debug logs including timestamps (needs LOG_DGB too)
+#define SHOW_WOLFSSL_DEBUG 1 
+// Comment out to NOT see memory debug
+#define MEMORY_DEBUG_SHOW 0
+
+#define WOLFSSL_KEYSHARE_GROUP WOLFSSL_ML_KEM_512
+/*
+WOLFSSL_ML_KEM_768         // works
+WOLFSSL_ML_KEM_1024      // Client sends no key;
+WOLFSSL_X25519MLKEM768    // works without the curve??
+WOLFSSL_SECP521R1MLKEM1024 // bad function argument
+WOLFSSL_SECP384R1MLKEM1024 // bad function argument
+WOLFSSL_X448MLKEM768      // bad function argument
+WOLFSSL_SECP256R1MLKEM768  // Client sends no key; Missing extension
+WOLFSSL_SECP384R1MLKEM768  // bad function argument
+WOLFSSL_X25519MLKEM512
+WOLFSSL_ML_KEM_512         // works
+WOLFSSL_SECP256R1MLKEM512 //  works
+WOLFSSL_ECC_SECP256R1
+WOLFSSL_ECC_X25519
+*/
 #define COAP_INTERVAL 6 // Set the time interval between CoAP PUT messages
 #define COAP_MAX 20     // Set the maximum number of CoAP messages before DTLS session shuts down
 #define USE_IPv4        // Comment out to use IPv6 instead of IPv4
+
+#if USE_DTLS_1_3
+#define DTLS_VERSION "1.3"
+#else 
+#define DTLS_VERSION "1.2"
+#endif
+
+#if USE_CERTS
+#define AUTH "CERT"
+#else 
+#define AUTH "PSK"
+#endif
 
 /* These lines are for adding colors to debug output */
 #define GREEN "\033[32m"
@@ -105,22 +139,6 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
 
-#define WOLFSSL_KEYSHARE_GROUP WOLFSSL_X25519MLKEM512
-/*
-WOLFSSL_ML_KEM_768         // works
-WOLFSSL_ML_KEM_1024      // Client sends no key;
-WOLFSSL_X25519MLKEM768    // works without the curve??
-WOLFSSL_SECP521R1MLKEM1024 // bad function argument
-WOLFSSL_SECP384R1MLKEM1024 // bad function argument
-WOLFSSL_X448MLKEM768      // bad function argument
-WOLFSSL_SECP256R1MLKEM768  // Client sends no key; Missing extension
-WOLFSSL_SECP384R1MLKEM768  // bad function argument
-WOLFSSL_X25519MLKEM512
-WOLFSSL_ML_KEM_512         // works
-WOLFSSL_SECP256R1MLKEM512 //  works
-WOLFSSL_ECC_SECP256R1
-WOLFSSL_ECC_X25519
-*/
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 
@@ -128,7 +146,7 @@ WOLFSSL_ECC_X25519
  * e.g. LOG_LEVEL_INF will print only your LOG_INF statements
  * LOG_LEVEL_ERR will print LOG_INF and LOG_ERR, etc.)
  */
-LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_NONE);
+LOG_MODULE_REGISTER(DTLS_CoAP_Project, LOG_LEVEL_DBG);
 
 static const struct gpio_dt_spec profiler_pin_10 = {
     .port = DEVICE_DT_GET(DT_NODELABEL(gpio0)), // GPIO controller
@@ -178,7 +196,7 @@ int main(void)
         gpio_pin_configure_dt(&profiler_pin_10, GPIO_OUTPUT_INACTIVE | GPIO_INPUT);
         gpio_pin_configure_dt(&profiler_pin_11, GPIO_OUTPUT_INACTIVE | GPIO_INPUT);
 
-#ifdef USE_DTLS_1_3
+#if USE_DTLS_1_3
         WOLFSSL_METHOD *method = wolfDTLSv1_3_client_method();
 #else
         WOLFSSL_METHOD *method = wolfDTLSv1_2_client_method();
@@ -205,7 +223,7 @@ int main(void)
 #endif
         wolfSSL_Init();
 
-#ifdef SHOW_WOLFSSL_DEBUG
+#if SHOW_WOLFSSL_DEBUG
         wolfSSL_SetLoggingCb(CustomLoggingCallback); // Comment out to get debug without timestamps (makes it a bit faster)
         wolfSSL_Debugging_ON();
         show_supported_ciphers(); // Comment out to NOT see the list of supported ciphes for your build
@@ -213,17 +231,17 @@ int main(void)
 
         ctx = wolfSSL_CTX_new(method);
 
-#ifdef USE_CERTS
+#if USE_CERTS
         setup_cert(ctx);
-#ifdef USE_DTLS_1_3
+#if USE_DTLS_1_3
         wolfSSL_CTX_set_cipher_list(ctx, "TLS13-AES128-GCM-SHA256"); // Force specific DTLS 1.3 ciphers
 #else
-wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force specific DTLS 1.2 ciphers
+        wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force specific DTLS 1.2 ciphers
 #endif
 #else
         wolfSSL_CTX_use_psk_identity_hint(ctx, PSK_IDENTITY);
         wolfSSL_CTX_set_psk_client_callback(ctx, my_psk_client_callback);
-#ifdef USE_DTLS_1_3
+#if USE_DTLS_1_3
         wolfSSL_CTX_set_cipher_list(ctx, "TLS13-AES128-GCM-SHA256"); // Force specific DTLS 1.3 PSK ciphers
 #else
         wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-PSK-AES128-GCM-SHA256"); // Force specific DTLS 1.2 PSK ciphers
@@ -236,11 +254,10 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
         wolfSSL_dtls_set_peer(ssl, &serverAddr6, sizeof(serverAddr6));
 #endif
         wolfSSL_set_fd(ssl, sockfd);
-        int rc1 = wolfSSL_UseSupportedCurve(ssl, WOLFSSL_KEYSHARE_GROUP);
-        int rc2 = wolfSSL_UseKeyShare(ssl, WOLFSSL_KEYSHARE_GROUP);
-        //LOG_INF("UseSupportedCurve=%d UseKeyShare=%d", rc1, rc2);
+        wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_KEYSHARE_GROUP);
+        wolfSSL_UseKeyShare(ssl, WOLFSSL_KEYSHARE_GROUP);
 
-#ifdef USE_CID
+#if USE_CID
         cid = wolfSSL_dtls_cid_use(ssl);
 #endif
         wolfSSL_dtls_set_timeout_init(ssl, 4);
@@ -250,7 +267,7 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
         gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 1); // Turn GPIO ON
         LOG_DBG(GREEN "Set GPIO pin 11 high. First Handshake\n" RESET);
 
-#ifdef MEMORY_DEBUG_SHOW
+#if MEMORY_DEBUG_SHOW
         InitMemoryTracker();
 #endif
         uint32_t t0 = k_uptime_get_32();
@@ -263,11 +280,11 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
         else
         {
                 uint32_t t1 = k_uptime_get_32();
-                LOG_INF(GREEN "1st Handshake ms=%u; Key Exchange =%s", (unsigned)(t1 - t0), STR(WOLFSSL_KEYSHARE_GROUP));
+                LOG_INF(GREEN "1st Handshake ms=%u; Key Exchange=%s; DTLS-Version=%s; Auth=%s", (unsigned)(t1 - t0), STR(WOLFSSL_KEYSHARE_GROUP), DTLS_VERSION, AUTH);
                 gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 0); // Turn GPIO OFF
                 LOG_DBG(GREEN "mwolfSSL handshake successful" RESET);
                 LOG_DBG(GREEN "Set GPIO pin 11 low. After first handshake\n" RESET);
-#ifdef MEMORY_DEBUG_SHOW
+#if MEMORY_DEBUG_SHOW
                 ShowMemoryTracker();
 #endif
         }
@@ -290,7 +307,7 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
                 {
                         LOG_DBG(GREEN "Set GPIO pin 10 high. Before sending CoAP\n" RESET);
                         gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 1); // Turn GPIO ON
-#ifdef MEMORY_DEBUG_SHOW
+#if MEMORY_DEBUG_SHOW
                         LOG_DBG(GREEN "Memory Tracker init\n" RESET);
                         InitMemoryTracker();
 #endif
@@ -340,7 +357,7 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
                         uint32_t t0 = k_uptime_get_32();
                         ret = wolfSSL_connect(ssl);
                         uint32_t t1 = k_uptime_get_32();
-                        LOG_INF(GREEN "Handshake ms=%u; Key Exchange=%s", (unsigned)(t1 - t0), STR(WOLFSSL_KEYSHARE_GROUP));
+                        LOG_INF(GREEN "Handshake ms=%u; Key Exchange=%s; DTLS-Version=%s; Auth=%s", (unsigned)(t1 - t0), STR(WOLFSSL_KEYSHARE_GROUP), DTLS_VERSION, AUTH);
                         LOG_DBG(GREEN "Set GPIO pin low\n" RESET);
                         gpio_pin_set(profiler_pin_11.port, profiler_pin_11.pin, 0); // Turn GPIO OFF
                         if (ret != WOLFSSL_SUCCESS)
@@ -356,7 +373,7 @@ wolfSSL_CTX_set_cipher_list(ctx, "ECDHE-ECDSA-AES128-GCM-SHA256"); // Force spec
                 }
                 LOG_DBG(GREEN "Set GPIO pin low\n" RESET);
                 gpio_pin_set(profiler_pin_10.port, profiler_pin_10.pin, 0); // Turn GPIO OFF
-#ifdef MEMORY_DEBUG_SHOW
+#if MEMORY_DEBUG_SHOW
                 LOG_DBG(GREEN "Memory Tracker show\n" RESET);
                 ShowMemoryTracker();
 #endif
