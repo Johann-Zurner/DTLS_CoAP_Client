@@ -50,7 +50,6 @@
 #include <wolfssl/ssl.h>
 
 #include <zephyr/drivers/gpio.h>
-#include <zephyr/net/coap.h>
 
 pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 #include <wolfssl/wolfcrypt/mem_track.h>
@@ -72,11 +71,11 @@ pthread_mutex_t memLock = PTHREAD_MUTEX_INITIALIZER;
 // Set to 0 to use DTLS 1.2 instead of 1.3
 #define USE_DTLS_1_3 1
 // Set to 0 to NOT see WolfSSL Debug logs including timestamps (needs LOG_DGB too)
-#define SHOW_WOLFSSL_DEBUG 1 
-// Comment out to NOT see memory debug
+#define SHOW_WOLFSSL_DEBUG 0 
+// Set to 0 to NOT see memory debug
 #define MEMORY_DEBUG_SHOW 0
 
-#define WOLFSSL_KEYSHARE_GROUP WOLFSSL_ML_KEM_512
+#define WOLFSSL_KEYSHARE_GROUP WOLFSSL_ECC_SECP256R1
 /*
 WOLFSSL_ML_KEM_768         // works
 WOLFSSL_ML_KEM_1024      // Client sends no key;
@@ -93,7 +92,7 @@ WOLFSSL_ECC_SECP256R1
 WOLFSSL_ECC_X25519
 */
 #define COAP_INTERVAL 6 // Set the time interval between CoAP PUT messages
-#define COAP_MAX 20     // Set the maximum number of CoAP messages before DTLS session shuts down
+#define COAP_MAX 2000     // Set the maximum number of CoAP messages before DTLS session shuts down
 #define USE_IPv4        // Comment out to use IPv6 instead of IPv4
 
 #if USE_DTLS_1_3
@@ -134,7 +133,7 @@ WOLFSSL_ECC_X25519
 #define PSK_KEY_LEN PSK_KEY_LEN_128
 #endif
 
-#define SERVER_IP "87.79.235.251"
+#define SERVER_IP "87.78.236.71"
 #define SERVER_IPv6 "2a0a:a54a:b18d::a00:27ff:fea4:55db" // IPv6 address
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
