@@ -133,7 +133,7 @@ WOLFSSL_ECC_X25519
 #define PSK_KEY_LEN PSK_KEY_LEN_128
 #endif
 
-#define SERVER_IP "87.78.236.71"
+#define SERVER_IP "123.123.236123.123"
 #define SERVER_IPv6 "2a0a:a54a:b18d::a00:27ff:fea4:55db" // IPv6 address
 #define SERVER_PORT 2444
 #define BUFFER_SIZE 1024
